@@ -17,6 +17,6 @@ class PlanningMeal extends Model
 
     public function recipe(): BelongsTo
     {
-        return $this->belongsTo(Recipe::class)->with('ingredients');
+        return $this->belongsTo(Recipe::class);
     }
 }

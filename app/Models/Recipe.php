@@ -30,7 +30,11 @@ class Recipe extends Model
 
     public function macros(): array
     {
-        if ($this->kcal_estimated !== null) {
+        if ($this->kcal_estimated !== null
+            && $this->proteines_estimated !== null
+            && $this->glucides_estimated !== null
+            && $this->lipides_estimated !== null
+        ) {
             return [
                 'kcal'      => (float) $this->kcal_estimated,
                 'proteines' => (float) $this->proteines_estimated,

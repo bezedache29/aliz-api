@@ -20,7 +20,7 @@ class LlmService
         };
 
         $decoded = json_decode($raw, true);
-        if (!is_array($decoded)) {
+        if (!is_array($decoded) || array_is_list($decoded) || !in_array($decoded['type'] ?? null, ['existing', 'new'], true)) {
             throw new \RuntimeException('Réponse LLM invalide : ' . $raw);
         }
 

@@ -32,7 +32,7 @@ class PlanningController extends Controller
     {
         $validated = $request->validated();
 
-        $recipes = Recipe::with('ingredients')->get();
+        $recipes = Recipe::select(['id', 'name', 'meal', 'category'])->get();
 
         $suggestion = app(LlmService::class)->suggestRecipe(
             $validated['date_key'],
@@ -54,7 +54,14 @@ class PlanningController extends Controller
     private function resolveRecipe(array $suggestion, string $mealType): Recipe
     {
         if ($suggestion['type'] === 'existing') {
+            if (empty($suggestion['recipe_id'])) {
+                throw new \RuntimeException('Réponse LLM invalide : recipe_id manquant');
+            }
             return Recipe::with('ingredients')->findOrFail($suggestion['recipe_id']);
+        }
+
+        if (empty($suggestion['name'])) {
+            throw new \RuntimeException('Réponse LLM invalide : name manquant');
         }
 
         return Recipe::create([
