@@ -42,7 +42,7 @@ class RecipeController extends Controller
             }
         });
 
-        return response()->json(new RecipeResource($recipe->fresh('ingredients')));
+        return response()->json(new RecipeResource($recipe->load('ingredients')));
     }
 
     public function destroy(Recipe $recipe): Response

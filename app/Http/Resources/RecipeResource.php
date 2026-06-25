@@ -14,7 +14,7 @@ class RecipeResource extends JsonResource
             'name'           => $this->name,
             'category'       => $this->category,
             'meal'           => $this->meal,
-            'ingredients'    => $this->ingredients->map(fn ($i) => [
+            'ingredients'    => $this->whenLoaded('ingredients', fn () => $this->ingredients->map(fn ($i) => [
                 'food_id'           => $i->food_id,
                 'food_name'         => $i->food_name,
                 'food_source'       => $i->food_source,
@@ -27,7 +27,7 @@ class RecipeResource extends JsonResource
                 'per100g_fibres'    => $i->per100g_fibres,
                 'per100g_sel'       => $i->per100g_sel,
                 'quantity_g'        => $i->quantity_g,
-            ])->all(),
+            ])->all(), []),
             'steps'          => $this->steps,
             'is_favorite'    => $this->is_favorite,
             'prep_time'      => $this->prep_time,

@@ -8,12 +8,12 @@ class UpdateRecipeRequest extends StoreRecipeRequest
     {
         $rules = parent::rules();
 
-        // Tous les champs deviennent optionnels sur un PUT partiel
-        $rules['name'][0] = 'sometimes';
-        $rules['category'][0] = 'sometimes';
-        $rules['ingredients'][0] = 'sometimes';
-        $rules['steps'][0] = 'sometimes';
-        $rules['seasons'][0] = 'sometimes';
+        foreach (['name', 'category', 'ingredients', 'steps', 'seasons'] as $field) {
+            $rules[$field] = array_map(
+                fn ($rule) => $rule === 'required' ? 'sometimes' : $rule,
+                $rules[$field]
+            );
+        }
 
         return $rules;
     }
