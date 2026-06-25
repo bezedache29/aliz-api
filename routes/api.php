@@ -21,8 +21,8 @@ Route::middleware('auth.static')->group(function () {
     // Poids & Suivi
     Route::get('weight', [WeightController::class, 'index']);
     Route::post('weight', [WeightController::class, 'store']);
-    Route::delete('weight/{weight}', [WeightController::class, 'destroy']);
     Route::post('weight/sync-renpho', [WeightController::class, 'syncRenpho']);
+    Route::delete('weight/{weight}', [WeightController::class, 'destroy']);
 
     // Profil
     Route::get('profile', [ProfileController::class, 'show']);
