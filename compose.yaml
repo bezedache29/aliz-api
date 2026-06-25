@@ -1,0 +1,94 @@
+services:
+    laravel.test:
+        build:
+            context: "./vendor/laravel/sail/runtimes/8.5"
+            dockerfile: Dockerfile
+            args:
+                WWWGROUP: "${WWWGROUP}"
+        image: "sail-8.5/app"
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
+        environment:
+            WWWUSER: "${WWWUSER}"
+            LARAVEL_SAIL: 1
+            XDEBUG_MODE: "${SAIL_XDEBUG_MODE:-off}"
+            XDEBUG_CONFIG: "${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}"
+            IGNITION_LOCAL_SITES_PATH: "${PWD}"
+        volumes:
+            - ".:/var/www/html"
+            - "/mnt/e/DEV/infrastructure/traefik/certs:/etc/traefik/certs:ro"
+        networks:
+            - sail
+            - traefik-network
+        depends_on:
+            - mysql
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.aliz-api.rule=Host(`${APP_DOMAIN}`)"
+            - "traefik.http.routers.aliz-api.entrypoints=websecure"
+            - "traefik.http.routers.aliz-api.tls=true"
+            - "traefik.http.services.aliz-api.loadbalancer.server.port=80"
+            - "traefik.docker.network=traefik-network"
+    mysql:
+        image: "mysql:8.4"
+        ports:
+            - "${FORWARD_DB_PORT:-3306}:3306"
+        environment:
+            MYSQL_ROOT_PASSWORD: "${DB_PASSWORD}"
+            MYSQL_ROOT_HOST: "%"
+            MYSQL_DATABASE: "${DB_DATABASE}"
+            MYSQL_USER: "${DB_USERNAME}"
+            MYSQL_PASSWORD: "${DB_PASSWORD}"
+            MYSQL_ALLOW_EMPTY_PASSWORD: 1
+            MYSQL_EXTRA_OPTIONS: "${MYSQL_EXTRA_OPTIONS:-}"
+        volumes:
+            - "aliz-api-mysql:/var/lib/mysql"
+            - "./vendor/laravel/sail/database/mysql/create-testing-database.sh:/docker-entrypoint-initdb.d/10-create-testing-database.sh"
+        networks:
+            - sail
+        healthcheck:
+            test:
+                - CMD
+                - mysqladmin
+                - ping
+                - "-p${DB_PASSWORD}"
+            retries: 3
+            timeout: 5s
+    phpmyadmin:
+        image: "phpmyadmin:latest"
+        links:
+            - mysql
+        environment:
+            PMA_HOST: mysql
+            PMA_PORT: 3306
+            PMA_ARBITRARY: 1
+        networks:
+            - sail
+            - traefik-network
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.pma-aliz-api.rule=Host(`pma-${APP_DOMAIN:-localhost}`)"
+            - "traefik.http.routers.pma-aliz-api.entrypoints=websecure"
+            - "traefik.http.routers.pma-aliz-api.tls=true"
+            - "traefik.http.services.pma-aliz-api.loadbalancer.server.port=80"
+            - "traefik.docker.network=traefik-network"
+    mailpit:
+        image: axllent/mailpit:latest
+        networks:
+            - sail
+            - traefik-network
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.mail-aliz-api.rule=Host(`mail.${APP_DOMAIN}`)"
+            - "traefik.http.routers.mail-aliz-api.entrypoints=websecure"
+            - "traefik.http.routers.mail-aliz-api.tls=true"
+            - "traefik.http.services.mail-aliz-api.loadbalancer.server.port=8025"
+            - "traefik.docker.network=traefik-network"
+networks:
+    sail:
+        driver: bridge
+    traefik-network:
+        external: true
+volumes:
+    aliz-api-mysql:
+        driver: local
