@@ -379,6 +379,31 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/Recipe'
+              example:
+                data:
+                  id: "018f1e2a-0000-7000-8000-000000000001"
+                  name: "Omelette au fromage"
+                  category: "Plat principal"
+                  meal: "Déjeuner"
+                  ingredients:
+                    - food_id: "egg001"
+                      food_name: "Œuf entier"
+                      food_source: "ciqual"
+                      food_brand: null
+                      food_barcode: null
+                      per100g_kcal: 143
+                      per100g_proteines: 12.6
+                      per100g_glucides: 0.6
+                      per100g_lipides: 9.9
+                      per100g_fibres: 0
+                      per100g_sel: 0.37
+                      quantity_g: 150
+                  steps: ["Battre les œufs", "Cuire à feu moyen"]
+                  is_favorite: false
+                  prep_time: 5
+                  cook_time: 10
+                  seasons: ["Printemps", "Été", "Automne", "Hiver"]
+                  cooking_method: "Poêle"
         '422':
           description: Validation échouée
           content:
@@ -468,6 +493,19 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/Recipe'
+              example:
+                data:
+                  id: "018f1e2a-0000-7000-8000-000000000001"
+                  name: "Omelette au fromage (modifiée)"
+                  category: "Plat principal"
+                  meal: "Dîner"
+                  ingredients: []
+                  steps: ["Battre les œufs", "Ajouter le fromage", "Cuire à feu moyen"]
+                  is_favorite: true
+                  prep_time: 5
+                  cook_time: 10
+                  seasons: ["Printemps", "Été"]
+                  cooking_method: "Poêle"
         '404':
           description: Recette introuvable
         '422':
@@ -589,6 +627,17 @@ paths:
                 properties:
                   recipe:
                     $ref: '#/components/schemas/PlanningRecipe'
+              example:
+                recipe:
+                  id: "019701a2-d3e4-7000-b5f6-000000000001"
+                  name: "Poulet rôti aux herbes"
+                  kcal: 480.0
+                  proteines: 42.0
+                  glucides: 5.0
+                  lipides: 30.0
+                  prep_time: 15
+                  cook_time: 60
+                  description: null
         '422':
           description: Paramètres de route invalides
           content:
@@ -625,6 +674,36 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/StockItem'
+              example:
+                data:
+                  - id: "019701a2-d3e4-7000-b5f6-000000000002"
+                    food_name: "Flocons d'avoine"
+                    food_id: "oat123"
+                    food_source: "openfoodfacts"
+                    food_brand: "Bjorg"
+                    food_barcode: "3123456789012"
+                    per100g_kcal: 370
+                    per100g_proteines: 13
+                    per100g_glucides: 58
+                    per100g_lipides: 7
+                    quantity_g: 500
+                    expiry_date: "2026-12-31"
+                    created_at: "2026-06-27T10:00:00.000000Z"
+                    updated_at: "2026-06-27T10:00:00.000000Z"
+                  - id: "019701a2-d3e4-7000-b5f6-000000000003"
+                    food_name: "Riz basmati"
+                    food_id: null
+                    food_source: null
+                    food_brand: null
+                    food_barcode: null
+                    per100g_kcal: null
+                    per100g_proteines: null
+                    per100g_glucides: null
+                    per100g_lipides: null
+                    quantity_g: 1000
+                    expiry_date: null
+                    created_at: "2026-06-27T10:00:00.000000Z"
+                    updated_at: "2026-06-27T10:00:00.000000Z"
 
     post:
       summary: Ajouter un aliment au stock
@@ -690,6 +769,22 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/StockItem'
+              example:
+                data:
+                  id: "019701a2-d3e4-7000-b5f6-000000000002"
+                  food_name: "Flocons d'avoine"
+                  food_id: "oat123"
+                  food_source: "openfoodfacts"
+                  food_brand: "Bjorg"
+                  food_barcode: "3123456789012"
+                  per100g_kcal: 370
+                  per100g_proteines: 13
+                  per100g_glucides: 58
+                  per100g_lipides: 7
+                  quantity_g: 500
+                  expiry_date: "2026-12-31"
+                  created_at: "2026-06-27T10:00:00.000000Z"
+                  updated_at: "2026-06-27T10:00:00.000000Z"
         '422':
           description: Validation échouée
           content:
@@ -767,6 +862,22 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/StockItem'
+              example:
+                data:
+                  id: "019701a2-d3e4-7000-b5f6-000000000002"
+                  food_name: "Flocons d'avoine"
+                  food_id: "oat123"
+                  food_source: "openfoodfacts"
+                  food_brand: "Bjorg"
+                  food_barcode: "3123456789012"
+                  per100g_kcal: 370
+                  per100g_proteines: 13
+                  per100g_glucides: 58
+                  per100g_lipides: 7
+                  quantity_g: 250
+                  expiry_date: "2026-12-31"
+                  created_at: "2026-06-27T10:00:00.000000Z"
+                  updated_at: "2026-06-27T11:00:00.000000Z"
         '404':
           description: Aliment introuvable
         '422':
@@ -912,6 +1023,19 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/Profile'
+              example:
+                data:
+                  id: "019701a2-d3e4-7000-b5f6-000000000010"
+                  first_name: "Christophe"
+                  age: 43
+                  gender: "male"
+                  height_cm: 178
+                  current_weight_kg: 82.5
+                  target_weight_kg: 75.0
+                  activity_level: "moderate"
+                  weight_loss_rate_kg: 0.5
+                  created_at: "2026-06-27T10:00:00.000000Z"
+                  updated_at: "2026-06-27T10:00:00.000000Z"
         '409':
           description: Un profil existe déjà
           content:
@@ -978,6 +1102,19 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/Profile'
+              example:
+                data:
+                  id: "019701a2-d3e4-7000-b5f6-000000000010"
+                  first_name: "Christophe"
+                  age: 44
+                  gender: "male"
+                  height_cm: 178
+                  current_weight_kg: 81.0
+                  target_weight_kg: 75.0
+                  activity_level: "moderate"
+                  weight_loss_rate_kg: 0.5
+                  created_at: "2026-06-27T10:00:00.000000Z"
+                  updated_at: "2026-06-27T11:00:00.000000Z"
         '404':
           description: Profil non trouvé
         '422':
