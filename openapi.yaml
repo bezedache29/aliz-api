@@ -72,10 +72,6 @@ components:
           type: number
           minimum: 0
 
-    RecipeIngredient:
-      allOf:
-        - $ref: '#/components/schemas/RecipeIngredientInput'
-
     Recipe:
       type: object
       properties:
@@ -106,10 +102,11 @@ components:
             - Déjeuner
             - Collation
             - Dîner
+            - ~
         ingredients:
           type: array
           items:
-            $ref: '#/components/schemas/RecipeIngredient'
+            $ref: '#/components/schemas/RecipeIngredientInput'
         steps:
           type: array
           items:
@@ -132,7 +129,7 @@ components:
         cooking_method:
           type: string
           nullable: true
-          enum: [Four, Poêle, Cookeo, Barbecue, Froid]
+          enum: [Four, Poêle, Cookeo, Barbecue, Froid, ~]
 
     PlanningRecipe:
       type: object
@@ -165,6 +162,10 @@ components:
     PlanningMeal:
       type: object
       properties:
+        date:
+          type: string
+          format: date
+          example: "2026-06-23"
         meal_type:
           type: string
           enum: [Petit-déjeuner, Déjeuner, Collation, Dîner]
@@ -304,6 +305,7 @@ paths:
                   type: array
                   items:
                     type: string
+                    minLength: 1
                 is_favorite:
                   type: boolean
                   default: false
@@ -332,7 +334,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Recipe'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Recipe'
         '422':
           description: Validation échouée
           content:
@@ -418,7 +423,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Recipe'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Recipe'
         '404':
           description: Recette introuvable
         '422':
@@ -443,6 +451,9 @@ paths:
     get:
       summary: Planning de la semaine
       tags: [Planning]
+      description: |
+        Retourne les repas planifiés sur 7 jours à partir de `from` (inclus).
+        Seuls les slots avec une recette assignée sont retournés (recipe_id non null).
       parameters:
         - name: from
           in: query
@@ -450,7 +461,7 @@ paths:
           schema:
             type: string
             format: date
-          description: Date de début de semaine (YYYY-MM-DD)
+          description: Premier jour de la semaine (YYYY-MM-DD). La réponse couvre `from` à `from + 6 jours`.
           example: "2026-06-23"
       responses:
         '200':
@@ -466,7 +477,8 @@ paths:
                       $ref: '#/components/schemas/PlanningMeal'
               example:
                 meals:
-                  - meal_type: "Déjeuner"
+                  - date: "2026-06-23"
+                    meal_type: "Déjeuner"
                     recipe:
                       id: "018f1e2a-0000-7000-8000-000000000001"
                       name: "Omelette au fromage"
@@ -476,6 +488,18 @@ paths:
                       lipides: 25.0
                       prep_time: 5
                       cook_time: 10
+                      description: null
+                  - date: "2026-06-24"
+                    meal_type: "Dîner"
+                    recipe:
+                      id: "019701a2-d3e4-7000-b5f6-000000000001"
+                      name: "Poulet rôti"
+                      kcal: 480.0
+                      proteines: 42.0
+                      glucides: 5.0
+                      lipides: 30.0
+                      prep_time: 15
+                      cook_time: 60
                       description: null
         '422':
           description: Paramètre `from` manquant ou invalide
@@ -530,6 +554,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Réponse LLM invalide (recipe_id ou name manquant)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Réponse LLM invalide : recipe_id manquant"
 
   # ─── Stock ───────────────────────────────────────────────────
 

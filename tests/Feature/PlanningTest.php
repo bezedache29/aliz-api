@@ -9,7 +9,7 @@ it('requires authentication for week', function () {
     $this->getJson('/api/planning/week?from=2026-06-26')->assertUnauthorized();
 });
 
-it('returns meals for a given day', function () {
+it('returns meals for the week', function () {
     $recipe = Recipe::factory()->hasIngredients(1)->create();
     PlanningMeal::factory()->create([
         'date'      => '2026-06-26',
@@ -18,18 +18,19 @@ it('returns meals for a given day', function () {
     ]);
 
     $this->withToken('test-token')
-        ->getJson('/api/planning/week?from=2026-06-26')
+        ->getJson('/api/planning/week?from=2026-06-23')
         ->assertOk()
         ->assertJsonStructure([
-            'meals' => [['meal_type', 'recipe' => ['id', 'name', 'kcal', 'proteines', 'glucides', 'lipides', 'prep_time', 'cook_time', 'description']]],
+            'meals' => [['date', 'meal_type', 'recipe' => ['id', 'name', 'kcal', 'proteines', 'glucides', 'lipides', 'prep_time', 'cook_time', 'description']]],
         ])
         ->assertJsonCount(1, 'meals')
+        ->assertJsonPath('meals.0.date', '2026-06-26')
         ->assertJsonPath('meals.0.meal_type', 'Déjeuner');
 });
 
-it('returns empty meals array when no planning for that day', function () {
+it('returns empty meals array when no planning for the week', function () {
     $this->withToken('test-token')
-        ->getJson('/api/planning/week?from=2026-06-26')
+        ->getJson('/api/planning/week?from=2026-06-23')
         ->assertOk()
         ->assertJsonPath('meals', []);
 });
@@ -152,6 +153,19 @@ it('accepts optional prompt in regenerate', function () {
             'prompt' => 'quelque chose de léger',
         ])
         ->assertOk();
+});
+
+it('returns 500 when LLM response is invalid', function () {
+    $this->mock(LlmService::class, function ($mock) {
+        $mock->shouldReceive('suggestRecipe')
+            ->once()
+            ->andReturn(['type' => 'existing']);
+    });
+
+    $this->withToken('test-token')
+        ->postJson('/api/planning/week/2026-06-26/meals/D%C3%A9jeuner/regenerate')
+        ->assertStatus(500)
+        ->assertJsonPath('message', 'Réponse LLM invalide : recipe_id manquant');
 });
 
 it('rejects invalid meal type in regenerate', function () {

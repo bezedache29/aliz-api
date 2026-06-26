@@ -56,10 +56,10 @@ it('creates a recipe', function () {
         ->postJson('/api/recipes', recipePayload());
 
     $response->assertCreated()
-        ->assertJsonStructure(['id', 'name', 'category', 'meal', 'ingredients', 'steps', 'is_favorite', 'prep_time', 'cook_time', 'seasons', 'cooking_method'])
-        ->assertJsonPath('name', 'Crêpes bretonnes')
-        ->assertJsonPath('category', 'Dessert')
-        ->assertJsonCount(1, 'ingredients');
+        ->assertJsonStructure(['data' => ['id', 'name', 'category', 'meal', 'ingredients', 'steps', 'is_favorite', 'prep_time', 'cook_time', 'seasons', 'cooking_method']])
+        ->assertJsonPath('data.name', 'Crêpes bretonnes')
+        ->assertJsonPath('data.category', 'Dessert')
+        ->assertJsonCount(1, 'data.ingredients');
 
     expect(Recipe::count())->toBe(1);
 });
@@ -88,7 +88,7 @@ it('updates a recipe', function () {
     $this->withToken('test-token')
         ->putJson("/api/recipes/{$recipe->id}", array_merge(recipePayload(), ['name' => 'Nouvelle recette']))
         ->assertOk()
-        ->assertJsonPath('name', 'Nouvelle recette');
+        ->assertJsonPath('data.name', 'Nouvelle recette');
 });
 
 it('syncs ingredients on update', function () {
@@ -99,7 +99,7 @@ it('syncs ingredients on update', function () {
             'ingredients' => [ingredientPayload()],
         ]))
         ->assertOk()
-        ->assertJsonCount(1, 'ingredients');
+        ->assertJsonCount(1, 'data.ingredients');
 });
 
 it('deletes a recipe', function () {

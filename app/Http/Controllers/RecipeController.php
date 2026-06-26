@@ -28,7 +28,7 @@ class RecipeController extends Controller
             return $recipe;
         });
 
-        return response()->json(new RecipeResource($recipe->load('ingredients')), 201);
+        return response()->json(['data' => new RecipeResource($recipe->load('ingredients'))], 201);
     }
 
     public function update(UpdateRecipeRequest $request, Recipe $recipe): JsonResponse
@@ -42,7 +42,7 @@ class RecipeController extends Controller
             }
         });
 
-        return response()->json(new RecipeResource($recipe->load('ingredients')));
+        return response()->json(['data' => new RecipeResource($recipe->load('ingredients'))]);
     }
 
     public function destroy(Recipe $recipe): Response

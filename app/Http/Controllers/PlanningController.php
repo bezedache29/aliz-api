@@ -7,19 +7,24 @@ use App\Http\Requests\WeekPlanningRequest;
 use App\Models\PlanningMeal;
 use App\Models\Recipe;
 use App\Services\LlmService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 
 class PlanningController extends Controller
 {
     public function week(WeekPlanningRequest $request): JsonResponse
     {
-        $date = $request->validated()['from'];
+        $from = Carbon::parse($request->validated()['from']);
+        $to   = $from->copy()->addDays(6);
 
         $meals = PlanningMeal::with(['recipe.ingredients'])
-            ->where('date', $date)
+            ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
             ->whereNotNull('recipe_id')
+            ->orderBy('date')
+            ->orderBy('meal_type')
             ->get()
             ->map(fn(PlanningMeal $meal) => [
+                'date'      => $meal->date->toDateString(),
                 'meal_type' => $meal->meal_type,
                 'recipe'    => $this->formatRecipe($meal->recipe),
             ])
@@ -41,7 +46,11 @@ class PlanningController extends Controller
             $validated['prompt'] ?? null,
         );
 
-        $recipe = $this->resolveRecipe($suggestion, $mealType);
+        try {
+            $recipe = $this->resolveRecipe($suggestion, $mealType);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
 
         PlanningMeal::updateOrCreate(
             ['date' => $dateKey, 'meal_type' => $mealType],
