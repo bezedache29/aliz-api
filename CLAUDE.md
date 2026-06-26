@@ -5,7 +5,7 @@
 Quand l'utilisateur demande de commiter (mots : "commit", "commite", "commiter"), toujours suivre ces étapes dans l'ordre :
 
 1. **Commit** — créer le commit git (le hook pre-commit lance Pest automatiquement)
-2. **Code review** — lancer `/code-review medium` sur le diff committé — **sauf** si le message commence par `fix:` en réponse à une code review (inutile de re-reviewer les corrections)
+2. **Code review** — lancer `/code-review low` sur le diff committé — **sauf** si le message commence par `fix:` en réponse à une code review (inutile de re-reviewer les corrections)
 3. **Push** — `git push origin dev` si les tests passent et la review ne bloque pas
 
 Ne jamais pusher sans avoir fait la code review, sauf exception ci-dessus.

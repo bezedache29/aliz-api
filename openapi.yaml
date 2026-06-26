@@ -219,6 +219,47 @@ components:
           type: string
           format: date-time
 
+    Profile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "019701a2-d3e4-7000-b5f6-000000000010"
+        first_name:
+          type: string
+          example: "Christophe"
+        age:
+          type: integer
+          example: 43
+        gender:
+          type: string
+          enum: [male, female]
+          example: "male"
+        height_cm:
+          type: integer
+          example: 178
+        current_weight_kg:
+          type: number
+          example: 82.5
+        target_weight_kg:
+          type: number
+          example: 75.0
+        activity_level:
+          type: string
+          enum: [sedentary, light, moderate, active, very_active]
+          example: "moderate"
+        weight_loss_rate_kg:
+          type: number
+          enum: [0.25, 0.5, 0.75, 1.0]
+          example: 0.5
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
     ValidationError:
       type: object
       properties:
@@ -796,18 +837,155 @@ paths:
     get:
       summary: Afficher le profil
       tags: [Profil]
-      description: "Non implémenté (TODO)"
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Profile'
+              example:
+                data:
+                  id: "019701a2-d3e4-7000-b5f6-000000000010"
+                  first_name: "Christophe"
+                  age: 43
+                  gender: "male"
+                  height_cm: 178
+                  current_weight_kg: 82.5
+                  target_weight_kg: 75.0
+                  activity_level: "moderate"
+                  weight_loss_rate_kg: 0.5
+                  created_at: "2026-06-27T10:00:00.000000Z"
+                  updated_at: "2026-06-27T10:00:00.000000Z"
+        '404':
+          description: Profil non trouvé
+
+    post:
+      summary: Créer le profil
+      tags: [Profil]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [first_name, age, gender, height_cm, current_weight_kg, target_weight_kg, activity_level, weight_loss_rate_kg]
+              properties:
+                first_name:
+                  type: string
+                  maxLength: 100
+                age:
+                  type: integer
+                  minimum: 1
+                  maximum: 120
+                gender:
+                  type: string
+                  enum: [male, female]
+                height_cm:
+                  type: integer
+                  minimum: 50
+                  maximum: 300
+                current_weight_kg:
+                  type: number
+                  minimum: 20
+                  maximum: 500
+                target_weight_kg:
+                  type: number
+                  minimum: 20
+                  maximum: 500
+                activity_level:
+                  type: string
+                  enum: [sedentary, light, moderate, active, very_active]
+                weight_loss_rate_kg:
+                  type: number
+                  enum: [0.25, 0.5, 0.75, 1.0]
+      responses:
+        '201':
+          description: Profil créé
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Profile'
+        '409':
+          description: Un profil existe déjà
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Un profil existe déjà."
+        '422':
+          description: Validation échouée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
 
     put:
-      summary: Modifier le profil
+      summary: Modifier le profil (partiel)
       tags: [Profil]
-      description: "Non implémenté (TODO)"
+      description: Tous les champs sont optionnels — seuls les champs envoyés sont mis à jour.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                first_name:
+                  type: string
+                  maxLength: 100
+                age:
+                  type: integer
+                  minimum: 1
+                  maximum: 120
+                gender:
+                  type: string
+                  enum: [male, female]
+                height_cm:
+                  type: integer
+                  minimum: 50
+                  maximum: 300
+                current_weight_kg:
+                  type: number
+                  minimum: 20
+                  maximum: 500
+                target_weight_kg:
+                  type: number
+                  minimum: 20
+                  maximum: 500
+                activity_level:
+                  type: string
+                  enum: [sedentary, light, moderate, active, very_active]
+                weight_loss_rate_kg:
+                  type: number
+                  enum: [0.25, 0.5, 0.75, 1.0]
       responses:
         '200':
-          description: OK
+          description: Profil mis à jour
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Profile'
+        '404':
+          description: Profil non trouvé
+        '422':
+          description: Validation échouée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
 
 tags:
   - name: Recettes
@@ -819,4 +997,4 @@ tags:
   - name: Poids
     description: Suivi du poids (non implémenté)
   - name: Profil
-    description: Profil utilisateur (non implémenté)
+    description: Profil utilisateur (données sources — BMR/TDEE/macros calculés côté app)
