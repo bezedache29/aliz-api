@@ -6,6 +6,11 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreStockItemRequest extends FormRequest
 {
+    public function authorize(): bool
+    {
+        return true;
+    }
+
     public function rules(): array
     {
         return [
@@ -18,8 +23,8 @@ class StoreStockItemRequest extends FormRequest
             'per100g_proteines' => ['nullable', 'numeric', 'min:0'],
             'per100g_glucides'  => ['nullable', 'numeric', 'min:0'],
             'per100g_lipides'   => ['nullable', 'numeric', 'min:0'],
-            'quantity_g'        => ['required', 'numeric', 'min:0'],
-            'expiry_date'       => ['nullable', 'date'],
+            'quantity_g'        => ['required', 'numeric', 'min:0.01'],
+            'expiry_date'       => ['nullable', 'date_format:Y-m-d'],
         ];
     }
 }

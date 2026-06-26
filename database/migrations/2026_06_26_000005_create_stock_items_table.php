@@ -15,13 +15,14 @@ return new class extends Migration
             $table->string('food_source')->nullable();
             $table->string('food_brand')->nullable();
             $table->string('food_barcode')->nullable();
-            $table->float('per100g_kcal')->nullable();
-            $table->float('per100g_proteines')->nullable();
-            $table->float('per100g_glucides')->nullable();
-            $table->float('per100g_lipides')->nullable();
-            $table->float('quantity_g');
+            $table->decimal('per100g_kcal', 8, 2)->nullable();
+            $table->decimal('per100g_proteines', 8, 2)->nullable();
+            $table->decimal('per100g_glucides', 8, 2)->nullable();
+            $table->decimal('per100g_lipides', 8, 2)->nullable();
+            $table->decimal('quantity_g', 8, 2);
             $table->date('expiry_date')->nullable();
             $table->timestamps();
+            $table->index(['expiry_date', 'food_name']);
         });
     }
 

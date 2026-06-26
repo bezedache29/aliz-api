@@ -29,14 +29,14 @@ it('retourne la liste des articles en stock', function () {
         'quantity_g' => 1000,
     ]);
 
-    $this->withToken('test-token')
+    $this->withToken(config('app.static_api_token'))
         ->getJson('/api/stock')
         ->assertOk()
         ->assertJsonStructure(['data' => [['id', 'food_name', 'quantity_g']]]);
 });
 
 it('retourne une liste vide quand le stock est vide', function () {
-    $this->withToken('test-token')
+    $this->withToken(config('app.static_api_token'))
         ->getJson('/api/stock')
         ->assertOk()
         ->assertJson(['data' => []]);
@@ -47,7 +47,7 @@ it('trie les articles par date de péremption (nulls en dernier) puis par nom', 
     StockItem::create(['food_name' => 'Riz', 'quantity_g' => 500]);
     StockItem::create(['food_name' => 'Lait', 'quantity_g' => 1000, 'expiry_date' => '2026-07-01']);
 
-    $response = $this->withToken('test-token')->getJson('/api/stock');
+    $response = $this->withToken(config('app.static_api_token'))->getJson('/api/stock');
 
     $response->assertOk();
 
@@ -56,7 +56,7 @@ it('trie les articles par date de péremption (nulls en dernier) puis par nom', 
 });
 
 it('crée un article en stock', function () {
-    $this->withToken('test-token')
+    $this->withToken(config('app.static_api_token'))
         ->postJson('/api/stock', stockPayload())
         ->assertCreated()
         ->assertJsonStructure(['data' => ['id', 'food_name', 'quantity_g', 'expiry_date']])
@@ -67,7 +67,7 @@ it('crée un article en stock', function () {
 });
 
 it('crée un article minimal sans macros ni date de péremption', function () {
-    $this->withToken('test-token')
+    $this->withToken(config('app.static_api_token'))
         ->postJson('/api/stock', ['food_name' => 'Sel', 'quantity_g' => 250])
         ->assertCreated()
         ->assertJsonPath('data.food_name', 'Sel')
@@ -75,22 +75,29 @@ it('crée un article minimal sans macros ni date de péremption', function () {
 });
 
 it('refuse la création sans food_name', function () {
-    $this->withToken('test-token')
+    $this->withToken(config('app.static_api_token'))
         ->postJson('/api/stock', ['quantity_g' => 100])
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['food_name']);
 });
 
 it('refuse la création sans quantity_g', function () {
-    $this->withToken('test-token')
+    $this->withToken(config('app.static_api_token'))
         ->postJson('/api/stock', ['food_name' => 'Sucre'])
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['quantity_g']);
 });
 
 it('refuse une quantity_g négative', function () {
-    $this->withToken('test-token')
+    $this->withToken(config('app.static_api_token'))
         ->postJson('/api/stock', ['food_name' => 'Farine', 'quantity_g' => -100])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['quantity_g']);
+});
+
+it('refuse une quantity_g à zéro', function () {
+    $this->withToken(config('app.static_api_token'))
+        ->postJson('/api/stock', ['food_name' => 'Farine', 'quantity_g' => 0])
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['quantity_g']);
 });
@@ -98,7 +105,7 @@ it('refuse une quantity_g négative', function () {
 it('met à jour un article en stock', function () {
     $item = StockItem::create(['food_name' => 'Lentilles', 'quantity_g' => 400]);
 
-    $this->withToken('test-token')
+    $this->withToken(config('app.static_api_token'))
         ->putJson("/api/stock/{$item->id}", ['quantity_g' => 200])
         ->assertOk()
         ->assertJsonPath('data.quantity_g', 200);
@@ -109,14 +116,14 @@ it('met à jour un article en stock', function () {
 it('met à jour la date de péremption', function () {
     $item = StockItem::create(['food_name' => 'Yaourt', 'quantity_g' => 150]);
 
-    $this->withToken('test-token')
+    $this->withToken(config('app.static_api_token'))
         ->putJson("/api/stock/{$item->id}", ['expiry_date' => '2026-08-01'])
         ->assertOk()
         ->assertJsonPath('data.expiry_date', '2026-08-01');
 });
 
 it('retourne 404 si l\'article n\'existe pas (update)', function () {
-    $this->withToken('test-token')
+    $this->withToken(config('app.static_api_token'))
         ->putJson('/api/stock/uuid-inconnu', ['quantity_g' => 100])
         ->assertNotFound();
 });
@@ -124,7 +131,7 @@ it('retourne 404 si l\'article n\'existe pas (update)', function () {
 it('supprime un article du stock', function () {
     $item = StockItem::create(['food_name' => 'Quinoa', 'quantity_g' => 300]);
 
-    $this->withToken('test-token')
+    $this->withToken(config('app.static_api_token'))
         ->deleteJson("/api/stock/{$item->id}")
         ->assertNoContent();
 
@@ -132,12 +139,16 @@ it('supprime un article du stock', function () {
 });
 
 it('retourne 404 si l\'article n\'existe pas (delete)', function () {
-    $this->withToken('test-token')
+    $this->withToken(config('app.static_api_token'))
         ->deleteJson('/api/stock/uuid-inconnu')
         ->assertNotFound();
 });
 
 it('rejette les requêtes non authentifiées', function () {
+    $item = StockItem::create(['food_name' => 'Test', 'quantity_g' => 100]);
+
     $this->getJson('/api/stock')->assertUnauthorized();
     $this->postJson('/api/stock', stockPayload())->assertUnauthorized();
+    $this->putJson("/api/stock/{$item->id}", ['quantity_g' => 50])->assertUnauthorized();
+    $this->deleteJson("/api/stock/{$item->id}")->assertUnauthorized();
 });

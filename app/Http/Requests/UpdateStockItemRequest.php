@@ -2,24 +2,19 @@
 
 namespace App\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
-
-class UpdateStockItemRequest extends FormRequest
+class UpdateStockItemRequest extends StoreStockItemRequest
 {
     public function rules(): array
     {
-        return [
-            'food_name'         => ['sometimes', 'required', 'string', 'max:255'],
-            'food_id'           => ['nullable', 'string', 'max:255'],
-            'food_source'       => ['nullable', 'string', 'max:100'],
-            'food_brand'        => ['nullable', 'string', 'max:255'],
-            'food_barcode'      => ['nullable', 'string', 'max:100'],
-            'per100g_kcal'      => ['nullable', 'numeric', 'min:0'],
-            'per100g_proteines' => ['nullable', 'numeric', 'min:0'],
-            'per100g_glucides'  => ['nullable', 'numeric', 'min:0'],
-            'per100g_lipides'   => ['nullable', 'numeric', 'min:0'],
-            'quantity_g'        => ['sometimes', 'required', 'numeric', 'min:0'],
-            'expiry_date'       => ['nullable', 'date'],
-        ];
+        $rules = parent::rules();
+
+        foreach (['food_name', 'quantity_g'] as $field) {
+            $rules[$field] = array_map(
+                fn ($rule) => $rule === 'required' ? 'sometimes' : $rule,
+                $rules[$field]
+            );
+        }
+
+        return $rules;
     }
 }

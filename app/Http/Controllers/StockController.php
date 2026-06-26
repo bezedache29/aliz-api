@@ -6,6 +6,7 @@ use App\Http\Requests\StoreStockItemRequest;
 use App\Http\Requests\UpdateStockItemRequest;
 use App\Models\StockItem;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 
 class StockController extends Controller
 {
@@ -29,13 +30,13 @@ class StockController extends Controller
     {
         $stock->update($request->validated());
 
-        return response()->json(['data' => $stock]);
+        return response()->json(['data' => $stock->refresh()]);
     }
 
-    public function destroy(StockItem $stock): JsonResponse
+    public function destroy(StockItem $stock): Response
     {
         $stock->delete();
 
-        return response()->json(null, 204);
+        return response()->noContent();
     }
 }
