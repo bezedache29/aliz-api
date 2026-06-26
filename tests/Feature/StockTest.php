@@ -19,9 +19,6 @@ function stockPayload(): array
     ];
 }
 
-beforeEach(function () {
-    config(['app.static_api_token' => 'test-token']);
-});
 
 it('retourne la liste des articles en stock', function () {
     StockItem::create([

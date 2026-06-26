@@ -36,9 +36,6 @@ function recipePayload(): array
     ];
 }
 
-beforeEach(function () {
-    config(['app.static_api_token' => 'test-token']);
-});
 
 it('requires authentication', function () {
     $this->getJson('/api/recipes')->assertUnauthorized();

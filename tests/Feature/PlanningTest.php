@@ -4,9 +4,6 @@ use App\Models\PlanningMeal;
 use App\Models\Recipe;
 use App\Services\LlmService;
 
-beforeEach(function () {
-    config(['app.static_api_token' => 'test-token']);
-});
 
 it('requires authentication for week', function () {
     $this->getJson('/api/planning/week?from=2026-06-26')->assertUnauthorized();
