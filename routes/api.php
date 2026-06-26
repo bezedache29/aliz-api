@@ -26,5 +26,6 @@ Route::middleware('auth.static')->group(function () {
 
     // Profil
     Route::get('profile', [ProfileController::class, 'show']);
+    Route::post('profile', [ProfileController::class, 'store']);
     Route::put('profile', [ProfileController::class, 'update']);
 });
