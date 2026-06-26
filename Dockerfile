@@ -5,22 +5,13 @@ RUN apk add --no-cache \
     nginx \
     supervisor \
     curl \
-    libzip-dev \
-    libxml2-dev \
-    libpng-dev \
-    icu-dev \
     zip \
     unzip \
     mysql-client
 
-# PHP extensions
-RUN docker-php-ext-install \
-    pdo_mysql \
-    zip \
-    bcmath \
-    xml \
-    intl \
-    opcache
+# PHP extensions via binaires pré-compilés (évite compilation from-source)
+COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
+RUN install-php-extensions pdo_mysql zip bcmath xml intl opcache
 
 # Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
