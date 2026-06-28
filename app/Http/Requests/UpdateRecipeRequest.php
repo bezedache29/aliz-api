@@ -8,7 +8,7 @@ class UpdateRecipeRequest extends StoreRecipeRequest
     {
         $rules = parent::rules();
 
-        foreach (['name', 'category', 'ingredients', 'steps', 'seasons'] as $field) {
+        foreach (['name', 'category', 'ingredients', 'seasons'] as $field) {
             $rules[$field] = array_map(
                 fn ($rule) => $rule === 'required' ? 'sometimes' : $rule,
                 $rules[$field]
