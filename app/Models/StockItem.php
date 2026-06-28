@@ -11,9 +11,9 @@ class StockItem extends Model
     use HasFactory, HasUuids;
 
     protected $fillable = [
-        'food_name', 'food_id', 'food_source', 'food_brand', 'food_barcode',
+        'food_name', 'category', 'food_id', 'food_source', 'food_brand', 'food_barcode',
         'per100g_kcal', 'per100g_proteines', 'per100g_glucides', 'per100g_lipides',
-        'quantity_g', 'expiry_date',
+        'quantity_g', 'unit', 'expiry_date', 'state',
     ];
 
     protected $casts = [

@@ -207,6 +207,25 @@ components:
           nullable: true
         quantity_g:
           type: number
+        unit:
+          type: string
+          example: "g"
+        category:
+          type: string
+          enum:
+            - Frais
+            - Sec
+            - Conserve
+            - Surgelé
+        state:
+          type: string
+          nullable: true
+          enum:
+            - cru
+            - cuit
+            - ouvert
+            - préparé
+            - surgelé
         expiry_date:
           type: string
           format: date
@@ -754,6 +773,25 @@ paths:
                 quantity_g:
                   type: number
                   minimum: 0.01
+                unit:
+                  type: string
+                  maxLength: 50
+                category:
+                  type: string
+                  enum:
+                    - Frais
+                    - Sec
+                    - Conserve
+                    - Surgelé
+                state:
+                  type: string
+                  nullable: true
+                  enum:
+                    - cru
+                    - cuit
+                    - ouvert
+                    - préparé
+                    - surgelé
                 expiry_date:
                   type: string
                   format: date
@@ -848,6 +886,25 @@ paths:
                 quantity_g:
                   type: number
                   minimum: 0.01
+                unit:
+                  type: string
+                  maxLength: 50
+                category:
+                  type: string
+                  enum:
+                    - Frais
+                    - Sec
+                    - Conserve
+                    - Surgelé
+                state:
+                  type: string
+                  nullable: true
+                  enum:
+                    - cru
+                    - cuit
+                    - ouvert
+                    - préparé
+                    - surgelé
                 expiry_date:
                   type: string
                   format: date

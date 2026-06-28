@@ -13,8 +13,12 @@ class StoreStockItemRequest extends FormRequest
 
     public function rules(): array
     {
+        $categories = ['Frais', 'Sec', 'Conserve', 'Surgelé'];
+        $states = ['cru', 'cuit', 'ouvert', 'préparé', 'surgelé'];
+
         return [
             'food_name'         => ['required', 'string', 'max:255'],
+            'category'          => ['nullable', 'string', 'in:'.implode(',', $categories)],
             'food_id'           => ['nullable', 'string', 'max:255'],
             'food_source'       => ['nullable', 'string', 'max:100'],
             'food_brand'        => ['nullable', 'string', 'max:255'],
@@ -24,7 +28,9 @@ class StoreStockItemRequest extends FormRequest
             'per100g_glucides'  => ['nullable', 'numeric', 'min:0'],
             'per100g_lipides'   => ['nullable', 'numeric', 'min:0'],
             'quantity_g'        => ['required', 'numeric', 'min:0.01'],
+            'unit'              => ['nullable', 'string', 'max:50'],
             'expiry_date'       => ['nullable', 'date_format:Y-m-d'],
+            'state'             => ['nullable', 'string', 'in:'.implode(',', $states)],
         ];
     }
 }
