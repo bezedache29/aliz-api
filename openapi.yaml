@@ -324,14 +324,23 @@ paths:
                   liked:
                     type: array
                     items:
-                      type: string
+                      $ref: '#/components/schemas/FoodPreference'
                   disliked:
                     type: array
                     items:
-                      type: string
+                      $ref: '#/components/schemas/FoodPreference'
               example:
-                liked: ["Poulet", "Brocoli", "Lentilles"]
-                disliked: ["Foie", "Betterave"]
+                liked:
+                  - id: "019701a2-d3e4-7000-b5f6-000000000020"
+                    food_name: "Poulet"
+                    type: "liked"
+                  - id: "019701a2-d3e4-7000-b5f6-000000000021"
+                    food_name: "Brocoli"
+                    type: "liked"
+                disliked:
+                  - id: "019701a2-d3e4-7000-b5f6-000000000022"
+                    food_name: "Foie"
+                    type: "disliked"
 
     post:
       summary: Ajouter une préférence alimentaire

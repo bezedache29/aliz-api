@@ -13,9 +13,15 @@ class FoodPreferenceController extends Controller
     {
         $preferences = FoodPreference::all()->groupBy('type');
 
+        $format = fn ($items) => $items->map(fn ($p) => [
+            'id'        => $p->id,
+            'food_name' => $p->food_name,
+            'type'      => $p->type,
+        ])->values();
+
         return response()->json([
-            'liked'    => $preferences->get('liked', collect())->pluck('food_name')->values(),
-            'disliked' => $preferences->get('disliked', collect())->pluck('food_name')->values(),
+            'liked'    => $format($preferences->get('liked', collect())),
+            'disliked' => $format($preferences->get('disliked', collect())),
         ]);
     }
 

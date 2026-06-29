@@ -14,10 +14,10 @@ it('lists preferences grouped by type', function () {
     $this->withToken('test-token')
         ->getJson('/api/preferences')
         ->assertOk()
-        ->assertJsonStructure(['liked', 'disliked'])
+        ->assertJsonStructure(['liked' => [['id', 'food_name', 'type']], 'disliked' => [['id', 'food_name', 'type']]])
         ->assertJsonCount(2, 'liked')
         ->assertJsonCount(1, 'disliked')
-        ->assertJsonFragment(['liked' => ['Poulet', 'Brocoli']]);
+        ->assertJsonFragment(['food_name' => 'Poulet', 'type' => 'liked']);
 });
 
 it('returns empty lists when no preferences', function () {
