@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\FoodPreferenceController;
 use App\Http\Controllers\PlanningController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecipeController;
@@ -8,7 +9,13 @@ use App\Http\Controllers\WeightController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth.static')->group(function () {
+    // Préférences alimentaires
+    Route::get('preferences', [FoodPreferenceController::class, 'index']);
+    Route::post('preferences', [FoodPreferenceController::class, 'store']);
+    Route::delete('preferences/{preference}', [FoodPreferenceController::class, 'destroy']);
+
     // Recettes
+    Route::post('recipes/generate', [RecipeController::class, 'generate']);
     Route::apiResource('recipes', RecipeController::class)->except(['show']);
 
     // Planning

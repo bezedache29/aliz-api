@@ -23,26 +23,38 @@ components:
       description: "Token statique défini dans .env → STATIC_API_TOKEN"
 
   schemas:
+    FoodPreference:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "019701a2-d3e4-7000-b5f6-000000000020"
+        food_name:
+          type: string
+          example: "Poulet"
+        type:
+          type: string
+          enum: [liked, disliked]
+
     RecipeIngredientInput:
       type: object
       required:
-        - food_id
         - food_name
-        - food_source
         - per100g_kcal
         - per100g_proteines
         - per100g_glucides
         - per100g_lipides
-        - per100g_fibres
-        - per100g_sel
         - quantity_g
       properties:
         food_id:
           type: string
+          nullable: true
         food_name:
           type: string
         food_source:
           type: string
+          nullable: true
           enum: [openfoodfacts, ciqual, aprifel, manual]
         food_brand:
           type: string
@@ -64,9 +76,11 @@ components:
           minimum: 0
         per100g_fibres:
           type: number
+          nullable: true
           minimum: 0
         per100g_sel:
           type: number
+          nullable: true
           minimum: 0
         quantity_g:
           type: number
@@ -293,6 +307,105 @@ components:
 
 paths:
 
+  # ─── Préférences alimentaires ────────────────────────────────
+
+  /preferences:
+    get:
+      summary: Lister les préférences alimentaires
+      tags: [Préférences]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  liked:
+                    type: array
+                    items:
+                      type: string
+                  disliked:
+                    type: array
+                    items:
+                      type: string
+              example:
+                liked: ["Poulet", "Brocoli", "Lentilles"]
+                disliked: ["Foie", "Betterave"]
+
+    post:
+      summary: Ajouter une préférence alimentaire
+      tags: [Préférences]
+      description: |
+        Si `food_name + type` existe déjà → 409.
+        Si `food_name` est dans l'autre liste → elle est retirée automatiquement avant l'ajout.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [food_name, type]
+              properties:
+                food_name:
+                  type: string
+                  minLength: 2
+                  maxLength: 100
+                  example: "Poulet"
+                type:
+                  type: string
+                  enum: [liked, disliked]
+      responses:
+        '201':
+          description: Préférence ajoutée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/FoodPreference'
+              example:
+                data:
+                  id: "019701a2-d3e4-7000-b5f6-000000000020"
+                  food_name: "Poulet"
+                  type: "liked"
+        '409':
+          description: Déjà dans la liste
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Déjà dans la liste"
+        '422':
+          description: Validation échouée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+  /preferences/{uuid}:
+    parameters:
+      - name: uuid
+        in: path
+        required: true
+        description: UUID de la préférence
+        example: "019701a2-d3e4-7000-b5f6-000000000020"
+        schema:
+          type: string
+          format: uuid
+    delete:
+      summary: Supprimer une préférence alimentaire
+      tags: [Préférences]
+      responses:
+        '204':
+          description: Supprimée avec succès
+        '404':
+          description: Préférence introuvable
+
   # ─── Recettes ───────────────────────────────────────────────
 
   /recipes:
@@ -429,6 +542,123 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ValidationError'
+
+  /recipes/generate:
+    post:
+      summary: Générer une recette via IA
+      tags: [Recettes]
+      description: |
+        Génère une recette complète via LLM en tenant compte du stock (DLC urgentes en priorité),
+        des préférences alimentaires et du profil nutritionnel.
+        Si `save=true` (défaut), la recette est sauvegardée en base et retournée via RecipeResource (201).
+        Si `save=false`, le JSON brut du LLM est retourné sans sauvegarde (200).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prompt]
+              properties:
+                prompt:
+                  type: string
+                  minLength: 3
+                  maxLength: 500
+                  example: "Un plat chaud avec du poulet et des légumes de saison"
+                save:
+                  type: boolean
+                  default: true
+                  description: Si false, la recette n'est pas sauvegardée en base
+      responses:
+        '201':
+          description: Recette générée et sauvegardée (save=true)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Recipe'
+              example:
+                data:
+                  id: "019f12f9-eae4-71f2-bb77-21e1e2c72423"
+                  name: "Poulet rôti aux légumes d'automne"
+                  category: "Plat principal"
+                  meal: "Dîner"
+                  ingredients:
+                    - food_name: "Poulet"
+                      food_id: null
+                      food_source: null
+                      food_brand: null
+                      food_barcode: null
+                      per100g_kcal: 165
+                      per100g_proteines: 31
+                      per100g_glucides: 0
+                      per100g_lipides: 3.6
+                      per100g_fibres: null
+                      per100g_sel: null
+                      quantity_g: 300
+                  steps: ["Préchauffer le four à 200°C", "Enfourner 45 min"]
+                  is_favorite: false
+                  prep_time: 15
+                  cook_time: 45
+                  seasons: ["Automne", "Hiver"]
+                  cooking_method: "Four"
+        '200':
+          description: Recette générée sans sauvegarde (save=false) — JSON brut du LLM
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  description:
+                    type: string
+                  category:
+                    type: string
+                  meal:
+                    type: string
+                    nullable: true
+                  cooking_method:
+                    type: string
+                    nullable: true
+                  seasons:
+                    type: array
+                    items:
+                      type: string
+                  prep_time:
+                    type: integer
+                  cook_time:
+                    type: integer
+                  kcal_estimated:
+                    type: number
+                  proteines_estimated:
+                    type: number
+                  glucides_estimated:
+                    type: number
+                  lipides_estimated:
+                    type: number
+                  steps:
+                    type: array
+                    items:
+                      type: string
+                  ingredients:
+                    type: array
+                    items:
+                      type: object
+        '422':
+          description: Validation échouée ou réponse LLM invalide
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationError'
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Réponse LLM invalide : not json"
 
   /recipes/{uuid}:
     parameters:
@@ -706,6 +936,9 @@ paths:
                     per100g_glucides: 58
                     per100g_lipides: 7
                     quantity_g: 500
+                    unit: "g"
+                    category: "Sec"
+                    state: null
                     expiry_date: "2026-12-31"
                     created_at: "2026-06-27T10:00:00.000000Z"
                     updated_at: "2026-06-27T10:00:00.000000Z"
@@ -720,6 +953,9 @@ paths:
                     per100g_glucides: null
                     per100g_lipides: null
                     quantity_g: 1000
+                    unit: "g"
+                    category: "Sec"
+                    state: null
                     expiry_date: null
                     created_at: "2026-06-27T10:00:00.000000Z"
                     updated_at: "2026-06-27T10:00:00.000000Z"
@@ -778,6 +1014,7 @@ paths:
                   maxLength: 50
                 category:
                   type: string
+                  nullable: true
                   enum:
                     - Frais
                     - Sec
@@ -820,6 +1057,9 @@ paths:
                   per100g_glucides: 58
                   per100g_lipides: 7
                   quantity_g: 500
+                  unit: "g"
+                  category: "Sec"
+                  state: null
                   expiry_date: "2026-12-31"
                   created_at: "2026-06-27T10:00:00.000000Z"
                   updated_at: "2026-06-27T10:00:00.000000Z"
@@ -932,6 +1172,9 @@ paths:
                   per100g_glucides: 58
                   per100g_lipides: 7
                   quantity_g: 250
+                  unit: "g"
+                  category: "Sec"
+                  state: null
                   expiry_date: "2026-12-31"
                   created_at: "2026-06-27T10:00:00.000000Z"
                   updated_at: "2026-06-27T11:00:00.000000Z"
@@ -1182,8 +1425,10 @@ paths:
                 $ref: '#/components/schemas/ValidationError'
 
 tags:
+  - name: Préférences
+    description: Aliments aimés / non aimés (utilisés par la génération IA)
   - name: Recettes
-    description: CRUD des recettes avec ingrédients
+    description: CRUD des recettes avec ingrédients + génération IA
   - name: Planning
     description: Planning hebdomadaire et régénération LLM
   - name: Stock
