@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'renpho' => [
+        'email'    => env('RENPHO_EMAIL'),
+        'password' => env('RENPHO_PASSWORD'),
+        'aes_key'  => env('RENPHO_AES_KEY'),
+    ],
+
 ];
