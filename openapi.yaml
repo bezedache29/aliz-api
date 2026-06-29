@@ -293,6 +293,64 @@ components:
           type: string
           format: date-time
 
+    WeightEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "019f13ca-91dc-7186-befb-fb78e1d0db27"
+        weight:
+          type: number
+          nullable: true
+          example: 110.7
+        bmi:
+          type: number
+          nullable: true
+          example: 37.0
+        bodyfat:
+          type: number
+          nullable: true
+          example: 37.2
+        water:
+          type: number
+          nullable: true
+          example: 45.3
+        muscle:
+          type: number
+          nullable: true
+          example: 40.3
+        bone:
+          type: number
+          nullable: true
+          example: 3.43
+        bmr:
+          type: number
+          nullable: true
+          example: 1851.0
+        protein:
+          type: number
+          nullable: true
+          example: 14.3
+        body_age:
+          type: number
+          nullable: true
+          example: 50.0
+        heart_rate:
+          type: number
+          nullable: true
+          example: 72.0
+        measured_at:
+          type: string
+          format: date-time
+          example: "2026-06-29T09:03:20.000000Z"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
     ValidationError:
       type: object
       properties:
@@ -1211,27 +1269,165 @@ paths:
     get:
       summary: Historique des pesées
       tags: [Poids]
-      description: "Non implémenté (TODO)"
+      description: Retourne les dernières pesées triées par date décroissante. Paramètre optionnel `limit` (1–200, défaut 30).
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Nombre de pesées à retourner (1–200, défaut 30)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 30
       responses:
         '200':
-          description: OK
+          description: Liste des pesées
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WeightEntry'
+              example:
+                data:
+                  - id: "019f13ca-91dc-7186-befb-fb78e1d0db27"
+                    weight: 110.7
+                    bmi: 37.0
+                    bodyfat: 37.2
+                    water: 45.3
+                    muscle: 40.3
+                    bone: 3.43
+                    bmr: 1851.0
+                    protein: 14.3
+                    body_age: 50.0
+                    heart_rate: 0.0
+                    measured_at: "2026-06-29T09:03:20.000000Z"
+                    created_at: "2026-06-29T14:31:10.000000Z"
+                    updated_at: "2026-06-29T14:31:10.000000Z"
+        '401':
+          description: Non authentifié
 
     post:
-      summary: Enregistrer une pesée
+      summary: Enregistrer une pesée manuellement
       tags: [Poids]
-      description: "Non implémenté (TODO)"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [weight, measured_at]
+              properties:
+                weight:
+                  type: number
+                  minimum: 20
+                  maximum: 500
+                bmi:
+                  type: number
+                  nullable: true
+                bodyfat:
+                  type: number
+                  nullable: true
+                water:
+                  type: number
+                  nullable: true
+                muscle:
+                  type: number
+                  nullable: true
+                bone:
+                  type: number
+                  nullable: true
+                bmr:
+                  type: number
+                  nullable: true
+                protein:
+                  type: number
+                  nullable: true
+                body_age:
+                  type: number
+                  nullable: true
+                heart_rate:
+                  type: number
+                  nullable: true
+                measured_at:
+                  type: string
+                  format: date-time
+            example:
+              weight: 110.5
+              bmi: 36.9
+              measured_at: "2026-06-29T08:00:00"
       responses:
         '201':
-          description: Créé
+          description: Pesée créée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/WeightEntry'
+              example:
+                data:
+                  id: "019f13ca-91dc-7186-befb-fb78e1d0db28"
+                  weight: 110.5
+                  bmi: 36.9
+                  bodyfat: null
+                  water: null
+                  muscle: null
+                  bone: null
+                  bmr: null
+                  protein: null
+                  body_age: null
+                  heart_rate: null
+                  measured_at: "2026-06-29T08:00:00.000000Z"
+                  created_at: "2026-06-29T14:35:00.000000Z"
+                  updated_at: "2026-06-29T14:35:00.000000Z"
+        '401':
+          description: Non authentifié
+        '422':
+          description: Validation échouée
 
   /weight/sync-renpho:
     post:
       summary: Synchroniser les données Renpho
       tags: [Poids]
-      description: "Non implémenté (TODO)"
+      description: Déclenche une synchronisation depuis la balance connectée Renpho. Récupère uniquement les mesures postérieures à la dernière pesée en base.
       responses:
         '200':
-          description: OK
+          description: Synchronisation effectuée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  new_entry:
+                    type: boolean
+                    description: true si au moins une nouvelle mesure a été importée
+                  weight:
+                    type: number
+                    nullable: true
+                    description: Poids de la dernière mesure en kg
+                  last_synced_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                    description: Date ISO de la dernière mesure en base
+              example:
+                new_entry: true
+                weight: 110.7
+                last_synced_at: "2026-06-29T09:03:20.000000Z"
+        '401':
+          description: Non authentifié
+        '502':
+          description: Impossible de contacter l'API Renpho
+          content:
+            application/json:
+              example:
+                message: "Impossible de synchroniser avec Renpho : Renpho auth failed: wrong user name or password"
 
   /weight/{uuid}:
     parameters:
@@ -1239,17 +1435,20 @@ paths:
         in: path
         required: true
         description: UUID de la pesée
-        example: "019701a2-d3e4-7000-b5f6-000000000003"
+        example: "019f13ca-91dc-7186-befb-fb78e1d0db27"
         schema:
           type: string
           format: uuid
     delete:
       summary: Supprimer une pesée
       tags: [Poids]
-      description: "Non implémenté (TODO)"
       responses:
         '204':
-          description: Supprimé
+          description: Supprimée avec succès
+        '401':
+          description: Non authentifié
+        '404':
+          description: Pesée introuvable
 
   # ─── Profil ──────────────────────────────────────────────────
 
