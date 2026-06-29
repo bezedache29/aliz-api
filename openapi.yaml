@@ -1642,6 +1642,6 @@ tags:
   - name: Stock
     description: Gestion du stock alimentaire
   - name: Poids
-    description: Suivi du poids (non implémenté)
+    description: Suivi du poids via saisie manuelle ou synchronisation Renpho
   - name: Profil
     description: Profil utilisateur (données sources — BMR/TDEE/macros calculés côté app)
