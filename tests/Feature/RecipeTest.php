@@ -59,9 +59,21 @@ it('creates a recipe', function () {
         ->assertJsonStructure(['data' => ['id', 'name', 'category', 'meal', 'ingredients', 'steps', 'is_favorite', 'prep_time', 'cook_time', 'seasons', 'cooking_method']])
         ->assertJsonPath('data.name', 'Crêpes bretonnes')
         ->assertJsonPath('data.category', 'Dessert')
+        ->assertJsonPath('data.is_ai_generated', false)
         ->assertJsonCount(1, 'data.ingredients');
 
     expect(Recipe::count())->toBe(1);
+});
+
+it('stores a recipe as ai generated when explicitly flagged by the client', function () {
+    $payload = array_merge(recipePayload(), ['is_ai_generated' => true]);
+
+    $this->withToken('test-token')
+        ->postJson('/api/recipes', $payload)
+        ->assertCreated()
+        ->assertJsonPath('data.is_ai_generated', true);
+
+    expect(Recipe::first()->is_ai_generated)->toBeTrue();
 });
 
 it('rejects invalid category', function () {

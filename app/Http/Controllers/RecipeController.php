@@ -27,7 +27,10 @@ class RecipeController extends Controller
     public function store(StoreRecipeRequest $request): JsonResponse
     {
         $recipe = DB::transaction(function () use ($request) {
-            $recipe = Recipe::create($request->safe()->except('ingredients'));
+            $attributes = $request->safe()->except('ingredients');
+            $attributes['is_ai_generated'] = $attributes['is_ai_generated'] ?? false;
+
+            $recipe = Recipe::create($attributes);
             $recipe->ingredients()->createMany($request->validated('ingredients'));
 
             return $recipe;
@@ -60,9 +63,10 @@ class RecipeController extends Controller
     public function generate(GenerateRecipeRequest $request): JsonResponse
     {
         $validated = $request->validated();
+        $useStock  = $validated['use_stock'] ?? true;
         $threshold = now()->addDays(7)->toDateString();
 
-        $allStock      = StockItem::all();
+        $allStock      = $useStock ? StockItem::all() : collect();
         $expiringStock = $allStock
             ->filter(fn ($i) => $i->expiry_date && $i->expiry_date->toDateString() <= $threshold)
             ->map(fn ($i) => ['food_name' => $i->food_name, 'quantity_g' => $i->quantity_g, 'expiry_date' => $i->expiry_date->toDateString()])
@@ -109,6 +113,7 @@ class RecipeController extends Controller
                 'seasons'             => $data['seasons'] ?? [],
                 'prep_time'           => $data['prep_time'] ?? null,
                 'cook_time'           => $data['cook_time'] ?? null,
+                'is_ai_generated'     => true,
                 'steps'               => $data['steps'],
                 'kcal_estimated'      => $data['kcal_estimated'] ?? null,
                 'proteines_estimated' => $data['proteines_estimated'] ?? null,

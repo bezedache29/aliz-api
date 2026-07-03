@@ -39,6 +39,7 @@ class StoreRecipeRequest extends FormRequest
             'steps'                       => ['nullable', 'array'],
             'steps.*'                     => ['string'],
             'is_favorite'                 => ['boolean'],
+            'is_ai_generated'             => ['sometimes', 'boolean'],
             'prep_time'                   => ['nullable', 'integer', 'min:0', 'max:65535'],
             'cook_time'                   => ['nullable', 'integer', 'min:0', 'max:65535'],
             'seasons'                     => ['required', 'array'],

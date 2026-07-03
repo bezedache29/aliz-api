@@ -13,14 +13,15 @@ class Recipe extends Model
 
     protected $fillable = [
         'name', 'category', 'meal', 'steps',
-        'is_favorite', 'prep_time', 'cook_time', 'seasons', 'cooking_method',
+        'is_favorite', 'is_ai_generated', 'prep_time', 'cook_time', 'seasons', 'cooking_method',
         'description', 'kcal_estimated', 'proteines_estimated', 'glucides_estimated', 'lipides_estimated',
     ];
 
     protected $casts = [
-        'steps'       => 'array',
-        'seasons'     => 'array',
-        'is_favorite' => 'boolean',
+        'steps'           => 'array',
+        'seasons'         => 'array',
+        'is_favorite'     => 'boolean',
+        'is_ai_generated' => 'boolean',
     ];
 
     public function ingredients(): HasMany

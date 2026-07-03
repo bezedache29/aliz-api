@@ -14,8 +14,9 @@ class GenerateRecipeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'prompt' => ['required', 'string', 'min:3', 'max:500'],
-            'save'   => ['sometimes', 'boolean'],
+            'prompt'    => ['required', 'string', 'min:3', 'max:500'],
+            'save'      => ['sometimes', 'boolean'],
+            'use_stock' => ['sometimes', 'boolean'],
         ];
     }
 }

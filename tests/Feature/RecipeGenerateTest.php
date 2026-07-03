@@ -51,10 +51,12 @@ it('generates and saves a recipe when save=true', function () {
         ->assertJsonStructure(['data' => ['id', 'name', 'category', 'meal', 'ingredients', 'steps', 'cooking_method']])
         ->assertJsonPath('data.name', 'Poulet rôti aux légumes')
         ->assertJsonPath('data.category', 'Plat principal')
+        ->assertJsonPath('data.is_ai_generated', true)
         ->assertJsonCount(1, 'data.ingredients');
 
     expect(Recipe::count())->toBe(1);
     expect(Recipe::first()->ingredients()->count())->toBe(1);
+    expect(Recipe::first()->is_ai_generated)->toBeTrue();
 });
 
 it('does not save when save=false and returns raw LLM data', function () {
@@ -101,6 +103,45 @@ it('passes expiring stock to the LLM', function () {
 
     $this->withToken('test-token')
         ->postJson('/api/recipes/generate', ['prompt' => 'Utilise le yaourt'])
+        ->assertCreated();
+});
+
+it('does not pass stock to the LLM when use_stock is false', function () {
+    StockItem::create([
+        'food_name'   => 'Yaourt',
+        'quantity_g'  => 150,
+        'expiry_date' => now()->addDays(3)->toDateString(),
+    ]);
+    StockItem::create(['food_name' => 'Riz', 'quantity_g' => 500]);
+
+    $this->mock(LlmService::class, function ($mock) {
+        $mock->shouldReceive('generateFullRecipe')
+            ->once()
+            ->withArgs(function ($prompt, $expiringStock, $otherStock) {
+                return $expiringStock === [] && $otherStock === [];
+            })
+            ->andReturn(llmRecipePayload());
+    });
+
+    $this->withToken('test-token')
+        ->postJson('/api/recipes/generate', ['prompt' => 'Une recette de saison', 'use_stock' => false])
+        ->assertCreated();
+});
+
+it('passes stock to the LLM by default when use_stock is omitted', function () {
+    StockItem::create(['food_name' => 'Riz', 'quantity_g' => 500]);
+
+    $this->mock(LlmService::class, function ($mock) {
+        $mock->shouldReceive('generateFullRecipe')
+            ->once()
+            ->withArgs(function ($prompt, $expiringStock, $otherStock) {
+                return count($otherStock) === 1 && $otherStock[0]['food_name'] === 'Riz';
+            })
+            ->andReturn(llmRecipePayload());
+    });
+
+    $this->withToken('test-token')
+        ->postJson('/api/recipes/generate', ['prompt' => 'Un plat avec du riz'])
         ->assertCreated();
 });
 

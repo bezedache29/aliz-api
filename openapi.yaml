@@ -127,6 +127,9 @@ components:
             type: string
         is_favorite:
           type: boolean
+        is_ai_generated:
+          type: boolean
+          description: True si la recette a été créée via POST /recipes/generate (save=true)
         prep_time:
           type: integer
           nullable: true
@@ -549,6 +552,10 @@ paths:
                 is_favorite:
                   type: boolean
                   default: false
+                is_ai_generated:
+                  type: boolean
+                  default: false
+                  description: À true si la recette enregistrée provient d'un aperçu généré par l'IA (POST /recipes/generate avec save=false)
                 prep_time:
                   type: integer
                   nullable: true
@@ -615,7 +622,7 @@ paths:
       summary: Générer une recette via IA
       tags: [Recettes]
       description: |
-        Génère une recette complète via LLM en tenant compte du stock (DLC urgentes en priorité),
+        Génère une recette complète via LLM en tenant compte du stock (DLC urgentes en priorité, sauf si `use_stock=false`),
         des préférences alimentaires et du profil nutritionnel.
         Si `save=true` (défaut), la recette est sauvegardée en base et retournée via RecipeResource (201).
         Si `save=false`, le JSON brut du LLM est retourné sans sauvegarde (200).
@@ -636,6 +643,10 @@ paths:
                   type: boolean
                   default: true
                   description: Si false, la recette n'est pas sauvegardée en base
+                use_stock:
+                  type: boolean
+                  default: true
+                  description: Si false, le stock n'est pas pris en compte — la recette est générée uniquement à partir des goûts (préférences) et du profil
       responses:
         '201':
           description: Recette générée et sauvegardée (save=true)

@@ -10,10 +10,10 @@ class RecipeResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id'             => $this->id,
-            'name'           => $this->name,
-            'category'       => $this->category,
-            'meal'           => $this->meal,
+            'id'              => $this->id,
+            'name'            => $this->name,
+            'category'        => $this->category,
+            'meal'            => $this->meal,
             'ingredients'    => $this->whenLoaded('ingredients', fn () => $this->ingredients->map(fn ($i) => [
                 'food_id'           => $i->food_id,
                 'food_name'         => $i->food_name,
@@ -28,12 +28,13 @@ class RecipeResource extends JsonResource
                 'per100g_sel'       => $i->per100g_sel,
                 'quantity_g'        => $i->quantity_g,
             ])->all(), []),
-            'steps'          => $this->steps,
-            'is_favorite'    => $this->is_favorite,
-            'prep_time'      => $this->prep_time,
-            'cook_time'      => $this->cook_time,
-            'seasons'        => $this->seasons,
-            'cooking_method' => $this->cooking_method,
+            'steps'           => $this->steps,
+            'is_favorite'     => $this->is_favorite,
+            'is_ai_generated' => $this->is_ai_generated,
+            'prep_time'       => $this->prep_time,
+            'cook_time'       => $this->cook_time,
+            'seasons'         => $this->seasons,
+            'cooking_method'  => $this->cooking_method,
         ];
     }
 }
