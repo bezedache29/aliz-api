@@ -1,10 +1,12 @@
 <?php
 
+use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\FoodPreferenceController;
 use App\Http\Controllers\PlanningController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecipeController;
 use App\Http\Controllers\StockController;
+use App\Http\Controllers\StravaAuthController;
 use App\Http\Controllers\WeightController;
 use Illuminate\Support\Facades\Route;
 
@@ -35,4 +37,9 @@ Route::middleware('auth.static')->group(function () {
     Route::get('profile', [ProfileController::class, 'show']);
     Route::post('profile', [ProfileController::class, 'store']);
     Route::put('profile', [ProfileController::class, 'update']);
+
+    // Strava & Activités
+    Route::get('strava/status', [StravaAuthController::class, 'status']);
+    Route::post('activities/sync-strava', [ActivityController::class, 'syncStrava']);
+    Route::get('activities', [ActivityController::class, 'index']);
 });

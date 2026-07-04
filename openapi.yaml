@@ -366,6 +366,48 @@ components:
             items:
               type: string
 
+    Activity:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "019f2a57-1dd3-7253-a7cf-00cbaf2b83eb"
+        strava_id:
+          type: integer
+          example: 987654321
+        name:
+          type: string
+          example: "Sortie VTT"
+        type:
+          type: string
+          example: "MountainBikeRide"
+        distance:
+          type: number
+          nullable: true
+          description: Distance en mètres
+          example: 15000.5
+        moving_time:
+          type: integer
+          nullable: true
+          description: Durée de mouvement en secondes
+          example: 3600
+        elapsed_time:
+          type: integer
+          nullable: true
+          description: Durée totale en secondes
+          example: 3700
+        started_at:
+          type: string
+          format: date-time
+          example: "2026-07-01T08:00:00.000000Z"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
 paths:
 
   # ─── Préférences alimentaires ────────────────────────────────
@@ -1461,6 +1503,107 @@ paths:
         '404':
           description: Pesée introuvable
 
+  # ─── Strava & Activités ─────────────────────────────────────
+
+  /strava/status:
+    get:
+      summary: Statut de la connexion Strava
+      tags: [Activités]
+      description: Indique si un compte Strava est connecté (le flux d'autorisation OAuth se fait via les routes web publiques `/strava/authorize` et `/strava/callback`, hors de ce contrat API).
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  connected:
+                    type: boolean
+                  athlete_name:
+                    type: string
+                    nullable: true
+                  last_synced_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+              example:
+                connected: true
+                athlete_name: "Christophe Salou"
+                last_synced_at: "2026-07-01T08:00:00.000000Z"
+        '401':
+          description: Non authentifié
+
+  /activities:
+    get:
+      summary: Historique des activités Strava
+      tags: [Activités]
+      description: Retourne les dernières activités triées par date décroissante. Paramètre optionnel `limit` (1–200, défaut 30).
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Nombre d'activités à retourner (1–200, défaut 30)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 30
+      responses:
+        '200':
+          description: Liste des activités
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Activity'
+        '401':
+          description: Non authentifié
+
+  /activities/sync-strava:
+    post:
+      summary: Synchroniser les activités Strava
+      tags: [Activités]
+      description: Déclenche une synchronisation depuis Strava. Récupère uniquement les activités postérieures à la dernière activité en base.
+      responses:
+        '200':
+          description: Synchronisation effectuée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  new_entries:
+                    type: integer
+                    description: Nombre de nouvelles activités importées
+                  latest_activity:
+                    allOf:
+                      - $ref: '#/components/schemas/Activity'
+                    nullable: true
+              example:
+                new_entries: 1
+                latest_activity:
+                  id: "019f2a57-1dd3-7253-a7cf-00cbaf2b83eb"
+                  strava_id: 987654321
+                  name: "Sortie VTT"
+                  type: "MountainBikeRide"
+                  distance: 15000.5
+                  moving_time: 3600
+                  elapsed_time: 3700
+                  started_at: "2026-07-01T08:00:00.000000Z"
+        '401':
+          description: Non authentifié
+        '502':
+          description: Impossible de contacter l'API Strava (ou aucun compte connecté)
+          content:
+            application/json:
+              example:
+                message: "Impossible de synchroniser avec Strava : Strava : aucun compte connecté"
+
   # ─── Profil ──────────────────────────────────────────────────
 
   /profile:
@@ -1654,5 +1797,7 @@ tags:
     description: Gestion du stock alimentaire
   - name: Poids
     description: Suivi du poids via saisie manuelle ou synchronisation Renpho
+  - name: Activités
+    description: Activités sportives synchronisées depuis Strava (connexion OAuth)
   - name: Profil
     description: Profil utilisateur (données sources — BMR/TDEE/macros calculés côté app)
