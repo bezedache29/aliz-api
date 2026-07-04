@@ -73,3 +73,58 @@ it('reports connected when a token exists', function () {
         ->assertJsonPath('connected', true)
         ->assertJsonPath('athlete_name', 'Christophe Salou');
 });
+
+// --- POST /api/strava/disconnect ---
+
+it('requires authentication for the disconnect endpoint', function () {
+    $this->postJson('/api/strava/disconnect')->assertUnauthorized();
+});
+
+it('deletes the token and revokes access on Strava', function () {
+    StravaToken::create([
+        'access_token'  => 'fake-access-token',
+        'refresh_token' => 'fake-refresh-token',
+        'expires_at'    => now()->addHour(),
+        'athlete_name'  => 'Christophe Salou',
+    ]);
+
+    Http::fake([
+        'www.strava.com/oauth/deauthorize' => Http::response(['access_token' => 'fake-access-token']),
+    ]);
+
+    $this->withToken('test-token')
+        ->postJson('/api/strava/disconnect')
+        ->assertOk()
+        ->assertJsonPath('connected', false);
+
+    expect(StravaToken::count())->toBe(0);
+    Http::assertSent(fn($request) => $request->url() === 'https://www.strava.com/oauth/deauthorize');
+});
+
+it('deletes the local token even when Strava revocation fails', function () {
+    StravaToken::create([
+        'access_token'  => 'fake-access-token',
+        'refresh_token' => 'fake-refresh-token',
+        'expires_at'    => now()->addHour(),
+    ]);
+
+    Http::fake([
+        'www.strava.com/oauth/deauthorize' => Http::response(null, 500),
+    ]);
+
+    $this->withToken('test-token')
+        ->postJson('/api/strava/disconnect')
+        ->assertOk()
+        ->assertJsonPath('connected', false);
+
+    expect(StravaToken::count())->toBe(0);
+});
+
+it('is a no-op when no account is connected', function () {
+    $this->withToken('test-token')
+        ->postJson('/api/strava/disconnect')
+        ->assertOk()
+        ->assertJsonPath('connected', false);
+
+    expect(StravaToken::count())->toBe(0);
+});

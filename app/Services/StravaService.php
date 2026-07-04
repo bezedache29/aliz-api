@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\StravaToken;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
+use Throwable;
 
 class StravaService
 {
@@ -83,6 +84,26 @@ class StravaService
         ]);
 
         return $token->access_token;
+    }
+
+    public function disconnect(): void
+    {
+        $token = StravaToken::first();
+
+        if (! $token) {
+            return;
+        }
+
+        try {
+            Http::asForm()->post(self::AUTH_BASE_URL . '/deauthorize', [
+                'access_token' => $token->access_token,
+            ]);
+        } catch (Throwable $e) {
+            // best-effort : la révocation côté Strava peut échouer (token déjà expiré,
+            // API injoignable...), on supprime quand même la connexion locale
+        }
+
+        StravaToken::query()->delete();
     }
 
     public function fetchActivities(?int $after = null): array

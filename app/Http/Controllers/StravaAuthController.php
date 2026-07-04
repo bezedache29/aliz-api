@@ -50,4 +50,11 @@ class StravaAuthController extends Controller
             'last_synced_at' => $lastEntry?->started_at?->toISOString(),
         ]);
     }
+
+    public function disconnect(StravaService $strava): JsonResponse
+    {
+        $strava->disconnect();
+
+        return response()->json(['connected' => false]);
+    }
 }

@@ -1534,6 +1534,26 @@ paths:
         '401':
           description: Non authentifié
 
+  /strava/disconnect:
+    post:
+      summary: Déconnecter le compte Strava
+      tags: [Activités]
+      description: Révoque l'accès côté Strava (best-effort) et supprime le token stocké localement. Les activités déjà synchronisées ne sont pas supprimées. Idempotent — aucune erreur si déjà déconnecté.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  connected:
+                    type: boolean
+              example:
+                connected: false
+        '401':
+          description: Non authentifié
+
   /activities:
     get:
       summary: Historique des activités Strava

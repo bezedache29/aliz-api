@@ -40,6 +40,7 @@ Route::middleware('auth.static')->group(function () {
 
     // Strava & Activités
     Route::get('strava/status', [StravaAuthController::class, 'status']);
+    Route::post('strava/disconnect', [StravaAuthController::class, 'disconnect']);
     Route::post('activities/sync-strava', [ActivityController::class, 'syncStrava']);
     Route::get('activities', [ActivityController::class, 'index']);
 });
