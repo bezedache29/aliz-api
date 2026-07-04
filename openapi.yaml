@@ -397,6 +397,16 @@ components:
           nullable: true
           description: Durée totale en secondes
           example: 3700
+        total_elevation_gain:
+          type: number
+          nullable: true
+          description: Dénivelé positif (D+) en mètres
+          example: 420.0
+        calories:
+          type: number
+          nullable: true
+          description: Calories brûlées — récupérées via l'endpoint détail Strava, uniquement au moment de la création de l'activité (pas de rafraîchissement rétroactif)
+          example: 870.2
         started_at:
           type: string
           format: date-time

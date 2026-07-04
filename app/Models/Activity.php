@@ -16,13 +16,17 @@ class Activity extends Model
         'distance',
         'moving_time',
         'elapsed_time',
+        'total_elevation_gain',
+        'calories',
         'started_at',
     ];
 
     protected $casts = [
-        'started_at'   => 'datetime',
-        'distance'     => 'float',
-        'moving_time'  => 'integer',
-        'elapsed_time' => 'integer',
+        'started_at'           => 'datetime',
+        'distance'             => 'float',
+        'moving_time'          => 'integer',
+        'elapsed_time'         => 'integer',
+        'total_elevation_gain' => 'float',
+        'calories'             => 'float',
     ];
 }

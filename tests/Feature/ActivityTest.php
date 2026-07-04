@@ -73,16 +73,18 @@ it('syncs new Strava activities and returns new entries count', function () {
         'www.strava.com/api/v3/athlete/activities*' => Http::sequence()
             ->push([
                 [
-                    'id'           => 987654321,
-                    'name'         => 'Sortie VTT',
-                    'sport_type'   => 'MountainBikeRide',
-                    'distance'     => 15000.5,
-                    'moving_time'  => 3600,
-                    'elapsed_time' => 3700,
-                    'start_date'   => '2026-07-01T08:00:00Z',
+                    'id'                   => 987654321,
+                    'name'                 => 'Sortie VTT',
+                    'sport_type'           => 'MountainBikeRide',
+                    'distance'             => 15000.5,
+                    'moving_time'          => 3600,
+                    'elapsed_time'         => 3700,
+                    'total_elevation_gain' => 420.0,
+                    'start_date'           => '2026-07-01T08:00:00Z',
                 ],
             ])
             ->push([]),
+        'www.strava.com/api/v3/activities/987654321' => Http::response(['calories' => 870.2]),
     ]);
 
     $this->withToken('test-token')
@@ -91,7 +93,38 @@ it('syncs new Strava activities and returns new entries count', function () {
         ->assertJsonPath('new_entries', 1)
         ->assertJsonPath('latest_activity.name', 'Sortie VTT');
 
-    expect(Activity::count())->toBe(1);
+    $activity = Activity::first();
+    expect($activity->total_elevation_gain)->toBe(420.0);
+    expect($activity->calories)->toBe(870.2);
+});
+
+it('does not fail the sync when the activity detail fetch fails', function () {
+    StravaToken::create([
+        'access_token'  => 'fake-access-token',
+        'refresh_token' => 'fake-refresh-token',
+        'expires_at'    => now()->addHour(),
+    ]);
+
+    Http::fake([
+        'www.strava.com/api/v3/athlete/activities*' => Http::sequence()
+            ->push([[
+                'id'         => 555,
+                'name'       => 'Sortie',
+                'sport_type' => 'Ride',
+                'start_date' => '2026-07-01T08:00:00Z',
+            ]])
+            ->push([]),
+        'www.strava.com/api/v3/activities/555' => Http::response(null, 500),
+    ]);
+
+    $this->withToken('test-token')
+        ->postJson('/api/activities/sync-strava')
+        ->assertOk()
+        ->assertJsonPath('new_entries', 1);
+
+    $activity = Activity::first();
+    expect($activity)->not->toBeNull();
+    expect($activity->calories)->toBeNull();
 });
 
 it('does not create duplicate activities on re-sync', function () {
@@ -112,6 +145,7 @@ it('does not create duplicate activities on re-sync', function () {
             ->push([])
             ->push([])
             ->push([]),
+        'www.strava.com/api/v3/activities/111' => Http::response(['calories' => 300.0]),
     ]);
 
     $this->withToken('test-token')->postJson('/api/activities/sync-strava');

@@ -131,4 +131,16 @@ class StravaService
 
         return $all;
     }
+
+    public function fetchActivityDetail(int $stravaId): array
+    {
+        $accessToken = $this->ensureFreshAccessToken();
+
+        $response = Http::withToken($accessToken)
+            ->get(self::API_BASE_URL . '/activities/' . $stravaId);
+
+        $response->throw();
+
+        return $response->json();
+    }
 }
