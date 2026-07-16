@@ -8,20 +8,43 @@ use Illuminate\Support\Facades\Http;
 
 class LlmService
 {
-    public function suggestRecipe(string $date, string $mealType, Collection $recipes, ?string $prompt, ?array $mealBudget = null): array
-    {
+    public function suggestRecipe(
+        string $date,
+        string $mealType,
+        Collection $recipes,
+        ?string $prompt,
+        ?array $mealBudget = null,
+        array $expiringStock = [],
+        array $otherStock = [],
+        array $likedFoods = [],
+        array $dislikedFoods = [],
+    ): array {
         $provider = config('llm.provider', 'anthropic');
         $system = $this->buildSystemPrompt();
-        $user = $this->buildUserMessage($date, $mealType, $recipes, $prompt, $mealBudget);
+        $user = $this->buildUserMessage(
+            $date,
+            $mealType,
+            $recipes,
+            $prompt,
+            $mealBudget,
+            $expiringStock,
+            $otherStock,
+            $likedFoods,
+            $dislikedFoods,
+        );
 
         $raw = match ($provider) {
-            'openai' => $this->callOpenAI($system, $user),
-            default  => $this->callAnthropic($system, $user),
+            'openai' => $this->callOpenAI($system, $user, 1024),
+            default  => $this->callAnthropic($system, $user, 1024),
         };
 
         $decoded = json_decode($raw, true);
         if (!is_array($decoded) || array_is_list($decoded) || !in_array($decoded['type'] ?? null, ['existing', 'new'], true)) {
             throw new \RuntimeException('Réponse LLM invalide : ' . $raw);
+        }
+
+        if ($decoded['type'] === 'new' && (empty($decoded['steps']) || empty($decoded['ingredients']))) {
+            throw new \RuntimeException('Réponse LLM invalide : steps ou ingredients manquants');
         }
 
         return $decoded;
@@ -37,15 +60,48 @@ Réponds UNIQUEMENT en JSON valide, sans markdown, sans explication.
 Si une recette existante convient, retourne :
 {"type":"existing","recipe_id":"<uuid>"}
 
-Sinon, crée une suggestion et retourne :
-{"type":"new","name":"<nom>","description":"<description courte>","kcal":<nombre>,"proteines":<nombre>,"glucides":<nombre>,"lipides":<nombre>,"prep_time":<minutes>,"cook_time":<minutes>}
+Règles de priorité pour les ingrédients d'une suggestion "new" :
+1. PRIORITÉ ABSOLUE aux aliments dont la DLC arrive bientôt (liste "expiring_soon") — intègre-les impérativement si la recette le permet.
+2. Utilise en priorité les aliments disponibles en stock (liste "other_stock").
+3. Tu peux suggérer des ingrédients hors stock si nécessaire pour compléter la recette.
+4. N'utilise JAMAIS les aliments de la liste "disliked_foods", et ne choisis pas de recette existante qui en contient.
+5. Favorise les aliments de la liste "liked_foods".
+
+Sinon, crée une suggestion complète et détaillée, et retourne :
+{
+  "type": "new",
+  "name": "<nom>",
+  "description": "<description courte>",
+  "kcal": <nombre>,
+  "proteines": <nombre>,
+  "glucides": <nombre>,
+  "lipides": <nombre>,
+  "prep_time": <minutes>,
+  "cook_time": <minutes>,
+  "steps": ["<étape 1>", "<étape 2>", ...],
+  "ingredients": [
+    {"food_name": "<nom>", "quantity_g": <nombre>, "per100g_kcal": <nombre>, "per100g_proteines": <nombre>, "per100g_glucides": <nombre>, "per100g_lipides": <nombre>}
+  ]
+}
+
+Les étapes et ingrédients sont obligatoires pour une suggestion "new" : l'utilisateur doit pouvoir cuisiner le plat rien qu'avec ces informations.
+Les macros (kcal, proteines, glucides, lipides) doivent être cohérentes avec les ingrédients et leurs quantités.
 
 Si un budget nutritionnel pour le repas est fourni, la suggestion (existante ou nouvelle) doit s'en rapprocher, avec une tolérance de ±15%.
 PROMPT;
     }
 
-    private function buildUserMessage(string $date, string $mealType, Collection $recipes, ?string $prompt, ?array $mealBudget = null): string
-    {
+    private function buildUserMessage(
+        string $date,
+        string $mealType,
+        Collection $recipes,
+        ?string $prompt,
+        ?array $mealBudget = null,
+        array $expiringStock = [],
+        array $otherStock = [],
+        array $likedFoods = [],
+        array $dislikedFoods = [],
+    ): string {
         $recipesJson = $recipes->map(fn(Recipe $r) => [
             'id'       => $r->id,
             'name'     => $r->name,
@@ -53,21 +109,38 @@ PROMPT;
             'category' => $r->category,
         ])->values()->toJson(JSON_UNESCAPED_UNICODE);
 
-        $contextLine = $prompt ? "Contexte : {$prompt}\n" : '';
+        $parts = ["Date : {$date}", "Type de repas : {$mealType}"];
 
-        $budgetLine = $mealBudget
-            ? "Budget nutritionnel pour ce repas : {$mealBudget['kcal']} kcal, {$mealBudget['proteines']}g protéines, {$mealBudget['glucides']}g glucides, {$mealBudget['lipides']}g lipides\n"
-            : '';
+        if ($prompt) {
+            $parts[] = "Contexte : {$prompt}";
+        }
 
-        return <<<MSG
-Date : {$date}
-Type de repas : {$mealType}
-{$contextLine}{$budgetLine}
-Recettes disponibles :
-{$recipesJson}
+        if ($mealBudget) {
+            $parts[] = "Budget nutritionnel pour ce repas : {$mealBudget['kcal']} kcal, {$mealBudget['proteines']}g protéines, {$mealBudget['glucides']}g glucides, {$mealBudget['lipides']}g lipides";
+        }
 
-Suggère la recette la plus adaptée.
-MSG;
+        if (!empty($expiringStock)) {
+            $list    = collect($expiringStock)->map(fn ($i) => "{$i['food_name']} ({$i['quantity_g']}g, DLC : {$i['expiry_date']})")->join(', ');
+            $parts[] = "⚠️ À utiliser EN PRIORITÉ (DLC proche) — expiring_soon : {$list}";
+        }
+
+        if (!empty($otherStock)) {
+            $list    = collect($otherStock)->map(fn ($i) => "{$i['food_name']} ({$i['quantity_g']}g)")->join(', ');
+            $parts[] = "Stock disponible — other_stock : {$list}";
+        }
+
+        if (!empty($likedFoods)) {
+            $parts[] = "Aliments aimés — liked_foods : " . implode(', ', $likedFoods);
+        }
+
+        if (!empty($dislikedFoods)) {
+            $parts[] = "Aliments NON aimés (à exclure) — disliked_foods : " . implode(', ', $dislikedFoods);
+        }
+
+        $parts[] = "Recettes disponibles :\n{$recipesJson}";
+        $parts[] = 'Suggère la recette la plus adaptée.';
+
+        return implode("\n", $parts);
     }
 
     public function generateFullRecipe(

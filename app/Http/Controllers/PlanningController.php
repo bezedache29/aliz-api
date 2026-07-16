@@ -7,9 +7,11 @@ use App\Http\Requests\WeekPlanningRequest;
 use App\Models\PlanningMeal;
 use App\Models\Recipe;
 use App\Services\LlmService;
+use App\Services\MealContextService;
 use App\Services\NutritionGoalService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 class PlanningController extends Controller
 {
@@ -38,8 +40,11 @@ class PlanningController extends Controller
     {
         $validated = $request->validated();
 
-        $recipes    = Recipe::select(['id', 'name', 'meal', 'category'])->get();
-        $mealBudget = app(NutritionGoalService::class)->mealGoals($validated['meal_type']);
+        $recipes     = Recipe::select(['id', 'name', 'meal', 'category'])->get();
+        $mealBudget  = app(NutritionGoalService::class)->mealGoals($validated['meal_type']);
+        $mealContext = app(MealContextService::class);
+        $stock       = $mealContext->stock();
+        $preferences = $mealContext->foodPreferences();
 
         $suggestion = app(LlmService::class)->suggestRecipe(
             $validated['date_key'],
@@ -47,6 +52,10 @@ class PlanningController extends Controller
             $recipes,
             $validated['prompt'] ?? null,
             $mealBudget,
+            $stock['expiring'],
+            $stock['other'],
+            $preferences['liked'],
+            $preferences['disliked'],
         );
 
         try {
@@ -76,20 +85,36 @@ class PlanningController extends Controller
             throw new \RuntimeException('Réponse LLM invalide : name manquant');
         }
 
-        return Recipe::create([
-            'name'                => $suggestion['name'],
-            'description'         => $suggestion['description'] ?? null,
-            'category'            => $this->categoryFromMealType($mealType),
-            'meal'                => $mealType,
-            'steps'               => [],
-            'seasons'             => [],
-            'kcal_estimated'      => $suggestion['kcal'] ?? null,
-            'proteines_estimated' => $suggestion['proteines'] ?? null,
-            'glucides_estimated'  => $suggestion['glucides'] ?? null,
-            'lipides_estimated'   => $suggestion['lipides'] ?? null,
-            'prep_time'           => $suggestion['prep_time'] ?? null,
-            'cook_time'           => $suggestion['cook_time'] ?? null,
-        ]);
+        return DB::transaction(function () use ($suggestion, $mealType) {
+            $recipe = Recipe::create([
+                'name'                => $suggestion['name'],
+                'description'         => $suggestion['description'] ?? null,
+                'category'            => $this->categoryFromMealType($mealType),
+                'meal'                => $mealType,
+                'steps'               => $suggestion['steps'] ?? [],
+                'seasons'             => [],
+                'is_ai_generated'     => true,
+                'kcal_estimated'      => $suggestion['kcal'] ?? null,
+                'proteines_estimated' => $suggestion['proteines'] ?? null,
+                'glucides_estimated'  => $suggestion['glucides'] ?? null,
+                'lipides_estimated'   => $suggestion['lipides'] ?? null,
+                'prep_time'           => $suggestion['prep_time'] ?? null,
+                'cook_time'           => $suggestion['cook_time'] ?? null,
+            ]);
+
+            $recipe->ingredients()->createMany(
+                collect($suggestion['ingredients'] ?? [])->map(fn ($i) => [
+                    'food_name'         => $i['food_name'],
+                    'quantity_g'        => $i['quantity_g'],
+                    'per100g_kcal'      => $i['per100g_kcal'],
+                    'per100g_proteines' => $i['per100g_proteines'],
+                    'per100g_glucides'  => $i['per100g_glucides'],
+                    'per100g_lipides'   => $i['per100g_lipides'],
+                ])->all()
+            );
+
+            return $recipe;
+        });
     }
 
     private function categoryFromMealType(string $mealType): string

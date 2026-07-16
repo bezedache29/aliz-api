@@ -1,8 +1,10 @@
 <?php
 
+use App\Models\FoodPreference;
 use App\Models\PlanningMeal;
 use App\Models\Profile;
 use App\Models\Recipe;
+use App\Models\StockItem;
 use App\Services\LlmService;
 
 
@@ -114,6 +116,45 @@ it('regenerates a meal with a new LLM-created recipe', function () {
     expect(PlanningMeal::count())->toBe(1);
 });
 
+it('persists steps and ingredients for a new LLM-created recipe', function () {
+    $this->mock(LlmService::class, function ($mock) {
+        $mock->shouldReceive('suggestRecipe')
+            ->once()
+            ->andReturn([
+                'type'        => 'new',
+                'name'        => 'Omelette au fromage',
+                'description' => 'Simple et rapide à préparer',
+                'kcal'        => 350.0,
+                'proteines'   => 25.0,
+                'glucides'    => 5.0,
+                'lipides'     => 28.0,
+                'prep_time'   => 5,
+                'cook_time'   => 10,
+                'steps'       => ['Battre les œufs', 'Cuire à la poêle'],
+                'ingredients' => [
+                    [
+                        'food_name'         => 'Œufs',
+                        'quantity_g'        => 120.0,
+                        'per100g_kcal'      => 150.0,
+                        'per100g_proteines' => 13.0,
+                        'per100g_glucides'  => 1.0,
+                        'per100g_lipides'   => 10.0,
+                    ],
+                ],
+            ]);
+    });
+
+    $this->withToken('test-token')
+        ->postJson('/api/planning/week/2026-06-26/meals/D%C3%A9jeuner/regenerate')
+        ->assertOk();
+
+    $recipe = Recipe::first();
+    expect($recipe->steps)->toBe(['Battre les œufs', 'Cuire à la poêle']);
+    expect($recipe->is_ai_generated)->toBeTrue();
+    expect($recipe->ingredients()->count())->toBe(1);
+    expect($recipe->ingredients()->first()->food_name)->toBe('Œufs');
+});
+
 it('updates existing planning slot on re-regenerate', function () {
     $recipe1 = Recipe::factory()->hasIngredients(1)->create();
     $recipe2 = Recipe::factory()->hasIngredients(1)->create();
@@ -193,6 +234,35 @@ it('passes a null meal budget to the LLM when no profile exists', function () {
         $mock->shouldReceive('suggestRecipe')
             ->once()
             ->withArgs(fn($date, $mealType, $recipes, $prompt, $mealBudget) => $mealBudget === null)
+            ->andReturn(['type' => 'existing', 'recipe_id' => $recipe->id]);
+    });
+
+    $this->withToken('test-token')
+        ->postJson('/api/planning/week/2026-06-26/meals/D%C3%A9jeuner/regenerate')
+        ->assertOk();
+});
+
+it('passes expiring stock, other stock and food preferences to the LLM', function () {
+    StockItem::create([
+        'food_name'   => 'Yaourt',
+        'quantity_g'  => 150,
+        'expiry_date' => now()->addDays(3)->toDateString(),
+    ]);
+    StockItem::create(['food_name' => 'Riz', 'quantity_g' => 500]);
+    FoodPreference::create(['food_name' => 'Saumon', 'type' => 'liked']);
+    FoodPreference::create(['food_name' => 'Foie', 'type' => 'disliked']);
+
+    $recipe = Recipe::factory()->hasIngredients(1)->create();
+
+    $this->mock(LlmService::class, function ($mock) use ($recipe) {
+        $mock->shouldReceive('suggestRecipe')
+            ->once()
+            ->withArgs(function ($date, $mealType, $recipes, $prompt, $mealBudget, $expiringStock, $otherStock, $likedFoods, $dislikedFoods) {
+                return count($expiringStock) === 1 && $expiringStock[0]['food_name'] === 'Yaourt'
+                    && count($otherStock) === 1 && $otherStock[0]['food_name'] === 'Riz'
+                    && $likedFoods === ['Saumon']
+                    && $dislikedFoods === ['Foie'];
+            })
             ->andReturn(['type' => 'existing', 'recipe_id' => $recipe->id]);
     });
 

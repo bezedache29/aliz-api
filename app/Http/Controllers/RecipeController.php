@@ -6,10 +6,9 @@ use App\Http\Requests\GenerateRecipeRequest;
 use App\Http\Requests\StoreRecipeRequest;
 use App\Http\Requests\UpdateRecipeRequest;
 use App\Http\Resources\RecipeResource;
-use App\Models\FoodPreference;
 use App\Models\Recipe;
-use App\Models\StockItem;
 use App\Services\LlmService;
+use App\Services\MealContextService;
 use App\Services\NutritionGoalService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
@@ -63,32 +62,20 @@ class RecipeController extends Controller
     public function generate(GenerateRecipeRequest $request): JsonResponse
     {
         $validated = $request->validated();
-        $useStock  = $validated['use_stock'] ?? true;
-        $threshold = now()->addDays(7)->toDateString();
+        $mealContext = app(MealContextService::class);
 
-        $allStock      = $useStock ? StockItem::all() : collect();
-        $expiringStock = $allStock
-            ->filter(fn ($i) => $i->expiry_date && $i->expiry_date->toDateString() <= $threshold)
-            ->map(fn ($i) => ['food_name' => $i->food_name, 'quantity_g' => $i->quantity_g, 'expiry_date' => $i->expiry_date->toDateString()])
-            ->values()->all();
-        $otherStock = $allStock
-            ->filter(fn ($i) => !$i->expiry_date || $i->expiry_date->toDateString() > $threshold)
-            ->map(fn ($i) => ['food_name' => $i->food_name, 'quantity_g' => $i->quantity_g])
-            ->values()->all();
-
-        $preferences   = FoodPreference::all()->groupBy('type');
-        $likedFoods    = $preferences->get('liked', collect())->pluck('food_name')->all();
-        $dislikedFoods = $preferences->get('disliked', collect())->pluck('food_name')->all();
+        $stock       = $mealContext->stock($validated['use_stock'] ?? true);
+        $preferences = $mealContext->foodPreferences();
 
         $profileContext = app(NutritionGoalService::class)->dailyGoals();
 
         try {
             $data = app(LlmService::class)->generateFullRecipe(
                 $validated['prompt'],
-                $expiringStock,
-                $otherStock,
-                $likedFoods,
-                $dislikedFoods,
+                $stock['expiring'],
+                $stock['other'],
+                $preferences['liked'],
+                $preferences['disliked'],
                 $profileContext,
             );
         } catch (\RuntimeException $e) {
