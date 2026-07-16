@@ -14,15 +14,33 @@ class MealContextService
 
         $expiring = $allStock
             ->filter(fn ($i) => $i->expiry_date && $i->expiry_date->toDateString() <= $threshold)
-            ->map(fn ($i) => ['food_name' => $i->food_name, 'quantity_g' => $i->quantity_g, 'expiry_date' => $i->expiry_date->toDateString()])
+            ->map(fn ($i) => [...$this->formatStockItem($i), 'expiry_date' => $i->expiry_date->toDateString()])
             ->values()->all();
 
         $other = $allStock
             ->filter(fn ($i) => !$i->expiry_date || $i->expiry_date->toDateString() > $threshold)
-            ->map(fn ($i) => ['food_name' => $i->food_name, 'quantity_g' => $i->quantity_g])
+            ->map(fn ($i) => $this->formatStockItem($i))
             ->values()->all();
 
         return ['expiring' => $expiring, 'other' => $other];
+    }
+
+    private function formatStockItem(StockItem $item): array
+    {
+        $data = [
+            'food_name' => $item->food_name,
+            'quantity'  => (float) $item->quantity_g,
+            'unit'      => $item->unit ?? 'g',
+        ];
+
+        if ($item->per100g_kcal !== null) {
+            $data['per100g_kcal']      = (float) $item->per100g_kcal;
+            $data['per100g_proteines'] = (float) $item->per100g_proteines;
+            $data['per100g_glucides']  = (float) $item->per100g_glucides;
+            $data['per100g_lipides']   = (float) $item->per100g_lipides;
+        }
+
+        return $data;
     }
 
     public function foodPreferences(): array

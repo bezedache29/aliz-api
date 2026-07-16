@@ -66,6 +66,8 @@ Règles de priorité pour les ingrédients d'une suggestion "new" :
 3. Tu peux suggérer des ingrédients hors stock si nécessaire pour compléter la recette.
 4. N'utilise JAMAIS les aliments de la liste "disliked_foods", et ne choisis pas de recette existante qui en contient.
 5. Favorise les aliments de la liste "liked_foods".
+6. Chaque aliment du stock est donné avec sa quantité DANS SON UNITÉ D'ORIGINE (g, pièce(s), boîte(s), tranche(s), portion(s), sachet(s)...), précisée entre parenthèses. Une quantité en "pièce(s)" ou "boîte(s)" n'est PAS un poids en grammes : déduis un poids réaliste pour ce type de produit (ex. une pièce de type plat cuisiné pané ~120-180g, une boîte de conserve ~200-400g). N'utilise jamais aveuglément le nombre affiché comme un grammage.
+7. N'utilise pas forcément la totalité du stock disponible : choisis une quantité cohérente avec une portion de repas pour ce type de plat.
 
 Sinon, crée une suggestion complète et détaillée, et retourne :
 {
@@ -120,13 +122,11 @@ PROMPT;
         }
 
         if (!empty($expiringStock)) {
-            $list    = collect($expiringStock)->map(fn ($i) => "{$i['food_name']} ({$i['quantity_g']}g, DLC : {$i['expiry_date']})")->join(', ');
-            $parts[] = "⚠️ À utiliser EN PRIORITÉ (DLC proche) — expiring_soon : {$list}";
+            $parts[] = "⚠️ À utiliser EN PRIORITÉ (DLC proche) — expiring_soon : {$this->formatStockList($expiringStock)}";
         }
 
         if (!empty($otherStock)) {
-            $list    = collect($otherStock)->map(fn ($i) => "{$i['food_name']} ({$i['quantity_g']}g)")->join(', ');
-            $parts[] = "Stock disponible — other_stock : {$list}";
+            $parts[] = "Stock disponible — other_stock : {$this->formatStockList($otherStock)}";
         }
 
         if (!empty($likedFoods)) {
@@ -141,6 +141,29 @@ PROMPT;
         $parts[] = 'Suggère la recette la plus adaptée.';
 
         return implode("\n", $parts);
+    }
+
+    private function formatStockList(array $items): string
+    {
+        return collect($items)->map(function (array $i) {
+            $line = "{$i['food_name']} ({$i['quantity']} {$i['unit']}";
+
+            if (isset($i['per100g_kcal'])) {
+                $line .= sprintf(
+                    ' ; %sg kcal/100g, P:%sg/100g, G:%sg/100g, L:%sg/100g',
+                    $i['per100g_kcal'],
+                    $i['per100g_proteines'],
+                    $i['per100g_glucides'],
+                    $i['per100g_lipides'],
+                );
+            }
+
+            if (isset($i['expiry_date'])) {
+                $line .= ", DLC : {$i['expiry_date']}";
+            }
+
+            return $line . ')';
+        })->join(', ');
     }
 
     public function generateFullRecipe(
@@ -186,6 +209,8 @@ Règles de priorité pour les ingrédients :
 3. Tu peux suggérer des ingrédients hors stock si nécessaire pour compléter la recette.
 4. N'utilise JAMAIS les aliments de la liste "disliked_foods".
 5. Favorise les aliments de la liste "liked_foods".
+6. Chaque aliment du stock est donné avec sa quantité DANS SON UNITÉ D'ORIGINE (g, pièce(s), boîte(s), tranche(s), portion(s), sachet(s)...), précisée entre parenthèses. Une quantité en "pièce(s)" ou "boîte(s)" n'est PAS un poids en grammes : déduis un poids réaliste pour ce type de produit (ex. une pièce de type plat cuisiné pané ~120-180g, une boîte de conserve ~200-400g) avant de renseigner "quantity_g" pour cet ingrédient. N'utilise jamais aveuglément le nombre affiché comme un grammage.
+7. N'utilise pas forcément la totalité du stock disponible : choisis une quantité cohérente avec une portion de repas pour ce type de plat.
 
 Le JSON doit suivre exactement ce schéma :
 {
@@ -234,13 +259,11 @@ PROMPT;
         }
 
         if (!empty($expiringStock)) {
-            $list    = collect($expiringStock)->map(fn ($i) => "{$i['food_name']} ({$i['quantity_g']}g, DLC : {$i['expiry_date']})")->join(', ');
-            $parts[] = "⚠️ À utiliser EN PRIORITÉ (DLC proche) — expiring_soon : {$list}";
+            $parts[] = "⚠️ À utiliser EN PRIORITÉ (DLC proche) — expiring_soon : {$this->formatStockList($expiringStock)}";
         }
 
         if (!empty($otherStock)) {
-            $list    = collect($otherStock)->map(fn ($i) => "{$i['food_name']} ({$i['quantity_g']}g)")->join(', ');
-            $parts[] = "Stock disponible — other_stock : {$list}";
+            $parts[] = "Stock disponible — other_stock : {$this->formatStockList($otherStock)}";
         }
 
         if (!empty($likedFoods)) {
