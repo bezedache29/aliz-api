@@ -40,11 +40,12 @@ class PlanningController extends Controller
     {
         $validated = $request->validated();
 
-        $recipes     = Recipe::select(['id', 'name', 'meal', 'category'])->get();
-        $mealBudget  = app(NutritionGoalService::class)->mealGoals($validated['meal_type']);
-        $mealContext = app(MealContextService::class);
-        $stock       = $mealContext->stock();
-        $preferences = $mealContext->foodPreferences();
+        $recipes       = Recipe::select(['id', 'name', 'meal', 'category'])->get();
+        $mealBudget    = app(NutritionGoalService::class)->mealGoals($validated['meal_type']);
+        $mealContext   = app(MealContextService::class);
+        $stock         = $mealContext->stock();
+        $preferences   = $mealContext->foodPreferences();
+        $plannedToday  = $this->plannedMealsForDay($validated['date_key'], $validated['meal_type']);
 
         $suggestion = app(LlmService::class)->suggestRecipe(
             $validated['date_key'],
@@ -56,6 +57,7 @@ class PlanningController extends Controller
             $stock['other'],
             $preferences['liked'],
             $preferences['disliked'],
+            $plannedToday,
         );
 
         try {
@@ -70,6 +72,21 @@ class PlanningController extends Controller
         );
 
         return response()->json(['recipe' => $this->formatRecipe($recipe)]);
+    }
+
+    private function plannedMealsForDay(string $dateKey, string $excludingMealType): array
+    {
+        return PlanningMeal::with('recipe.ingredients')
+            ->where('date', $dateKey)
+            ->where('meal_type', '!=', $excludingMealType)
+            ->get()
+            ->filter(fn (PlanningMeal $m) => $m->recipe !== null)
+            ->map(fn (PlanningMeal $m) => [
+                'meal_type'   => $m->meal_type,
+                'name'        => $m->recipe->name,
+                'ingredients' => $m->recipe->ingredients->pluck('food_name')->all(),
+            ])
+            ->values()->all();
     }
 
     private function resolveRecipe(array $suggestion, string $mealType): Recipe

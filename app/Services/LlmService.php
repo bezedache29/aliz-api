@@ -18,6 +18,7 @@ class LlmService
         array $otherStock = [],
         array $likedFoods = [],
         array $dislikedFoods = [],
+        array $plannedTodayMeals = [],
     ): array {
         $provider = config('llm.provider', 'anthropic');
         $system = $this->buildSystemPrompt();
@@ -31,6 +32,7 @@ class LlmService
             $otherStock,
             $likedFoods,
             $dislikedFoods,
+            $plannedTodayMeals,
         );
 
         $raw = match ($provider) {
@@ -57,17 +59,18 @@ Tu es un assistant nutritionnel pour l'app Aliz. Tu suggères des recettes adapt
 
 Réponds UNIQUEMENT en JSON valide, sans markdown, sans explication.
 
-Si une recette existante convient, retourne :
+Si une recette existante convient (et ne duplique pas un repas déjà prévu aujourd'hui, voir règle 1), retourne :
 {"type":"existing","recipe_id":"<uuid>"}
 
-Règles de priorité pour les ingrédients d'une suggestion "new" :
-1. PRIORITÉ ABSOLUE aux aliments dont la DLC arrive bientôt (liste "expiring_soon") — intègre-les impérativement si la recette le permet.
-2. Utilise en priorité les aliments disponibles en stock (liste "other_stock").
-3. Tu peux suggérer des ingrédients hors stock si nécessaire pour compléter la recette.
-4. N'utilise JAMAIS les aliments de la liste "disliked_foods", et ne choisis pas de recette existante qui en contient.
-5. Favorise les aliments de la liste "liked_foods".
-6. Chaque aliment du stock est donné avec sa quantité DANS SON UNITÉ D'ORIGINE (g, pièce(s), boîte(s), tranche(s), portion(s), sachet(s)...), précisée entre parenthèses. Une quantité en "pièce(s)" ou "boîte(s)" n'est PAS un poids en grammes : déduis un poids réaliste pour ce type de produit (ex. une pièce de type plat cuisiné pané ~120-180g, une boîte de conserve ~200-400g). N'utilise jamais aveuglément le nombre affiché comme un grammage.
-7. N'utilise pas forcément la totalité du stock disponible : choisis une quantité cohérente avec une portion de repas pour ce type de plat.
+Règles de priorité (valables aussi bien pour choisir une recette "existing" que pour créer une suggestion "new") :
+1. PRIORITÉ ABSOLUE À LA VARIÉTÉ : si des repas sont déjà prévus le même jour (liste "today_meals"), ne choisis pas une recette existante identique et ne réutilise PAS le même aliment principal (viande, poisson, féculent, légume principal) que l'un de ces repas — quitte à ignorer une opportunité d'écouler le stock ou la DLC. L'utilisateur ne veut pas manger la même chose au déjeuner et au dîner.
+2. Une fois la variété respectée, privilégie les aliments dont la DLC arrive bientôt (liste "expiring_soon") si c'est cohérent avec le repas — ce n'est qu'une préférence, pas une obligation si cela nuit à la variété.
+3. Utilise en priorité les aliments disponibles en stock (liste "other_stock").
+4. Tu peux suggérer des ingrédients hors stock si nécessaire pour compléter la recette ou pour varier.
+5. N'utilise JAMAIS les aliments de la liste "disliked_foods", et ne choisis pas de recette existante qui en contient.
+6. Favorise les aliments de la liste "liked_foods".
+7. Chaque aliment du stock est donné avec sa quantité DANS SON UNITÉ D'ORIGINE (g, pièce(s), boîte(s), tranche(s), portion(s), sachet(s)...), précisée entre parenthèses. Une quantité en "pièce(s)" ou "boîte(s)" n'est PAS un poids en grammes : déduis un poids réaliste pour ce type de produit (ex. une pièce de type plat cuisiné pané ~120-180g, une boîte de conserve ~200-400g). N'utilise jamais aveuglément le nombre affiché comme un grammage.
+8. N'utilise pas forcément la totalité du stock disponible : choisis une quantité cohérente avec une portion de repas pour ce type de plat.
 
 Sinon, crée une suggestion complète et détaillée, et retourne :
 {
@@ -103,6 +106,7 @@ PROMPT;
         array $otherStock = [],
         array $likedFoods = [],
         array $dislikedFoods = [],
+        array $plannedTodayMeals = [],
     ): string {
         $recipesJson = $recipes->map(fn(Recipe $r) => [
             'id'       => $r->id,
@@ -119,6 +123,13 @@ PROMPT;
 
         if ($mealBudget) {
             $parts[] = "Budget nutritionnel pour ce repas : {$mealBudget['kcal']} kcal, {$mealBudget['proteines']}g protéines, {$mealBudget['glucides']}g glucides, {$mealBudget['lipides']}g lipides";
+        }
+
+        if (!empty($plannedTodayMeals)) {
+            $list    = collect($plannedTodayMeals)
+                ->map(fn ($m) => "{$m['meal_type']} : {$m['name']} (" . implode(', ', $m['ingredients']) . ')')
+                ->join(' | ');
+            $parts[] = "🚫 Repas déjà prévus aujourd'hui (à NE PAS dupliquer, varie les ingrédients principaux) — today_meals : {$list}";
         }
 
         if (!empty($expiringStock)) {

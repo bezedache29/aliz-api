@@ -4,6 +4,7 @@ use App\Models\FoodPreference;
 use App\Models\PlanningMeal;
 use App\Models\Profile;
 use App\Models\Recipe;
+use App\Models\RecipeIngredient;
 use App\Models\StockItem;
 use App\Services\LlmService;
 
@@ -262,6 +263,57 @@ it('passes expiring stock, other stock and food preferences to the LLM', functio
                     && count($otherStock) === 1 && $otherStock[0]['food_name'] === 'Riz'
                     && $likedFoods === ['Saumon']
                     && $dislikedFoods === ['Foie'];
+            })
+            ->andReturn(['type' => 'existing', 'recipe_id' => $recipe->id]);
+    });
+
+    $this->withToken('test-token')
+        ->postJson('/api/planning/week/2026-06-26/meals/D%C3%A9jeuner/regenerate')
+        ->assertOk();
+});
+
+it('passes meals already planned today (excluding the current slot) to the LLM for variety', function () {
+    $lunchRecipe = Recipe::factory()
+        ->has(RecipeIngredient::factory()->count(1)->state(['food_name' => 'Poulet']), 'ingredients')
+        ->create(['name' => 'Poulet rôti']);
+    PlanningMeal::factory()->create([
+        'date'      => '2026-06-26',
+        'meal_type' => 'Déjeuner',
+        'recipe_id' => $lunchRecipe->id,
+    ]);
+
+    $dinnerRecipe = Recipe::factory()->hasIngredients(1)->create();
+
+    $this->mock(LlmService::class, function ($mock) use ($dinnerRecipe) {
+        $mock->shouldReceive('suggestRecipe')
+            ->once()
+            ->withArgs(function ($date, $mealType, $recipes, $prompt, $mealBudget, $expiringStock, $otherStock, $likedFoods, $dislikedFoods, $plannedTodayMeals) {
+                return count($plannedTodayMeals) === 1
+                    && $plannedTodayMeals[0]['meal_type'] === 'Déjeuner'
+                    && $plannedTodayMeals[0]['name'] === 'Poulet rôti'
+                    && $plannedTodayMeals[0]['ingredients'] === ['Poulet'];
+            })
+            ->andReturn(['type' => 'existing', 'recipe_id' => $dinnerRecipe->id]);
+    });
+
+    $this->withToken('test-token')
+        ->postJson('/api/planning/week/2026-06-26/meals/D%C3%AEner/regenerate')
+        ->assertOk();
+});
+
+it('excludes the slot being regenerated from plannedTodayMeals', function () {
+    $recipe = Recipe::factory()->hasIngredients(1)->create();
+    PlanningMeal::factory()->create([
+        'date'      => '2026-06-26',
+        'meal_type' => 'Déjeuner',
+        'recipe_id' => $recipe->id,
+    ]);
+
+    $this->mock(LlmService::class, function ($mock) use ($recipe) {
+        $mock->shouldReceive('suggestRecipe')
+            ->once()
+            ->withArgs(function ($date, $mealType, $recipes, $prompt, $mealBudget, $expiringStock, $otherStock, $likedFoods, $dislikedFoods, $plannedTodayMeals) {
+                return $plannedTodayMeals === [];
             })
             ->andReturn(['type' => 'existing', 'recipe_id' => $recipe->id]);
     });
