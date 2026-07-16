@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ActivityController;
+use App\Http\Controllers\CustomFoodController;
 use App\Http\Controllers\FoodPreferenceController;
 use App\Http\Controllers\PlanningController;
 use App\Http\Controllers\ProfileController;
@@ -26,6 +27,11 @@ Route::middleware('auth.static')->group(function () {
 
     // Stock alimentaire
     Route::apiResource('stock', StockController::class)->except(['show']);
+
+    // Aliments personnalisés
+    Route::get('custom-foods', [CustomFoodController::class, 'index']);
+    Route::post('custom-foods', [CustomFoodController::class, 'store']);
+    Route::delete('custom-foods/{customFood}', [CustomFoodController::class, 'destroy']);
 
     // Poids & Suivi
     Route::get('weight', [WeightController::class, 'index']);
