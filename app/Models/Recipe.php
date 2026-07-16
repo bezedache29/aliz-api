@@ -13,7 +13,7 @@ class Recipe extends Model
 
     protected $fillable = [
         'name', 'category', 'meal', 'steps',
-        'is_favorite', 'is_ai_generated', 'prep_time', 'cook_time', 'seasons', 'cooking_method',
+        'is_favorite', 'is_ai_generated', 'prep_time', 'cook_time', 'servings', 'seasons', 'cooking_method',
         'description', 'kcal_estimated', 'proteines_estimated', 'glucides_estimated', 'lipides_estimated',
     ];
 

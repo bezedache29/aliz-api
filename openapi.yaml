@@ -138,6 +138,9 @@ components:
           type: integer
           nullable: true
           description: Temps de cuisson en minutes
+        servings:
+          type: integer
+          description: Nombre de portions (défaut 1)
         seasons:
           type: array
           items:

@@ -33,6 +33,7 @@ class RecipeResource extends JsonResource
             'is_ai_generated' => $this->is_ai_generated,
             'prep_time'       => $this->prep_time,
             'cook_time'       => $this->cook_time,
+            'servings'        => $this->servings,
             'seasons'         => $this->seasons,
             'cooking_method'  => $this->cooking_method,
         ];

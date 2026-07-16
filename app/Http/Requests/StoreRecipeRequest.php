@@ -42,6 +42,7 @@ class StoreRecipeRequest extends FormRequest
             'is_ai_generated'             => ['sometimes', 'boolean'],
             'prep_time'                   => ['nullable', 'integer', 'min:0', 'max:65535'],
             'cook_time'                   => ['nullable', 'integer', 'min:0', 'max:65535'],
+            'servings'                    => ['nullable', 'integer', 'min:1', 'max:65535'],
             'seasons'                     => ['required', 'array'],
             'seasons.*'                   => ['string', 'in:'.implode(',', $seasons)],
             'cooking_method'              => ['nullable', 'string', 'in:'.implode(',', $cookingMethods)],
