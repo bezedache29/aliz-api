@@ -7,6 +7,7 @@ use App\Http\Requests\WeekPlanningRequest;
 use App\Models\PlanningMeal;
 use App\Models\Recipe;
 use App\Services\LlmService;
+use App\Services\NutritionGoalService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 
@@ -37,13 +38,15 @@ class PlanningController extends Controller
     {
         $validated = $request->validated();
 
-        $recipes = Recipe::select(['id', 'name', 'meal', 'category'])->get();
+        $recipes    = Recipe::select(['id', 'name', 'meal', 'category'])->get();
+        $mealBudget = app(NutritionGoalService::class)->mealGoals($validated['meal_type']);
 
         $suggestion = app(LlmService::class)->suggestRecipe(
             $validated['date_key'],
             $validated['meal_type'],
             $recipes,
             $validated['prompt'] ?? null,
+            $mealBudget,
         );
 
         try {

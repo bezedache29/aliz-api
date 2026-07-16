@@ -8,11 +8,11 @@ use Illuminate\Support\Facades\Http;
 
 class LlmService
 {
-    public function suggestRecipe(string $date, string $mealType, Collection $recipes, ?string $prompt): array
+    public function suggestRecipe(string $date, string $mealType, Collection $recipes, ?string $prompt, ?array $mealBudget = null): array
     {
         $provider = config('llm.provider', 'anthropic');
         $system = $this->buildSystemPrompt();
-        $user = $this->buildUserMessage($date, $mealType, $recipes, $prompt);
+        $user = $this->buildUserMessage($date, $mealType, $recipes, $prompt, $mealBudget);
 
         $raw = match ($provider) {
             'openai' => $this->callOpenAI($system, $user),
@@ -39,10 +39,12 @@ Si une recette existante convient, retourne :
 
 Sinon, crée une suggestion et retourne :
 {"type":"new","name":"<nom>","description":"<description courte>","kcal":<nombre>,"proteines":<nombre>,"glucides":<nombre>,"lipides":<nombre>,"prep_time":<minutes>,"cook_time":<minutes>}
+
+Si un budget nutritionnel pour le repas est fourni, la suggestion (existante ou nouvelle) doit s'en rapprocher, avec une tolérance de ±15%.
 PROMPT;
     }
 
-    private function buildUserMessage(string $date, string $mealType, Collection $recipes, ?string $prompt): string
+    private function buildUserMessage(string $date, string $mealType, Collection $recipes, ?string $prompt, ?array $mealBudget = null): string
     {
         $recipesJson = $recipes->map(fn(Recipe $r) => [
             'id'       => $r->id,
@@ -53,10 +55,14 @@ PROMPT;
 
         $contextLine = $prompt ? "Contexte : {$prompt}\n" : '';
 
+        $budgetLine = $mealBudget
+            ? "Budget nutritionnel pour ce repas : {$mealBudget['kcal']} kcal, {$mealBudget['proteines']}g protéines, {$mealBudget['glucides']}g glucides, {$mealBudget['lipides']}g lipides\n"
+            : '';
+
         return <<<MSG
 Date : {$date}
 Type de repas : {$mealType}
-{$contextLine}
+{$contextLine}{$budgetLine}
 Recettes disponibles :
 {$recipesJson}
 

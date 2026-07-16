@@ -7,10 +7,10 @@ use App\Http\Requests\StoreRecipeRequest;
 use App\Http\Requests\UpdateRecipeRequest;
 use App\Http\Resources\RecipeResource;
 use App\Models\FoodPreference;
-use App\Models\Profile;
 use App\Models\Recipe;
 use App\Models\StockItem;
 use App\Services\LlmService;
+use App\Services\NutritionGoalService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
@@ -80,9 +80,7 @@ class RecipeController extends Controller
         $likedFoods    = $preferences->get('liked', collect())->pluck('food_name')->all();
         $dislikedFoods = $preferences->get('disliked', collect())->pluck('food_name')->all();
 
-        $profile        = Profile::first();
-        $profileContext = $profile ? ['kcal' => 2000, 'proteines' => 150] : null;
-        // TODO : calculer les vraies cibles depuis le profil quand la logique macro sera définie
+        $profileContext = app(NutritionGoalService::class)->dailyGoals();
 
         try {
             $data = app(LlmService::class)->generateFullRecipe(

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\PlanningMeal;
+use App\Models\Profile;
 use App\Models\Recipe;
 use App\Services\LlmService;
 
@@ -152,6 +153,51 @@ it('accepts optional prompt in regenerate', function () {
         ->postJson('/api/planning/week/2026-06-26/meals/D%C3%A9jeuner/regenerate', [
             'prompt' => 'quelque chose de léger',
         ])
+        ->assertOk();
+});
+
+it('passes the meal nutritional budget to the LLM when a profile exists', function () {
+    Profile::create([
+        'first_name'          => 'Christophe',
+        'age'                 => 43,
+        'gender'              => 'male',
+        'height_cm'           => 178,
+        'current_weight_kg'   => 82.5,
+        'target_weight_kg'    => 75.0,
+        'activity_level'      => 'moderate',
+        'weight_loss_rate_kg' => 0.5,
+    ]);
+    $recipe = Recipe::factory()->hasIngredients(1)->create();
+
+    $this->mock(LlmService::class, function ($mock) use ($recipe) {
+        $mock->shouldReceive('suggestRecipe')
+            ->once()
+            ->withArgs(fn($date, $mealType, $recipes, $prompt, $mealBudget) => $mealBudget === [
+                'kcal'      => 762.0,
+                'proteines' => 58.0,
+                'glucides'  => 85.0,
+                'lipides'   => 21.0,
+            ])
+            ->andReturn(['type' => 'existing', 'recipe_id' => $recipe->id]);
+    });
+
+    $this->withToken('test-token')
+        ->postJson('/api/planning/week/2026-06-26/meals/D%C3%A9jeuner/regenerate')
+        ->assertOk();
+});
+
+it('passes a null meal budget to the LLM when no profile exists', function () {
+    $recipe = Recipe::factory()->hasIngredients(1)->create();
+
+    $this->mock(LlmService::class, function ($mock) use ($recipe) {
+        $mock->shouldReceive('suggestRecipe')
+            ->once()
+            ->withArgs(fn($date, $mealType, $recipes, $prompt, $mealBudget) => $mealBudget === null)
+            ->andReturn(['type' => 'existing', 'recipe_id' => $recipe->id]);
+    });
+
+    $this->withToken('test-token')
+        ->postJson('/api/planning/week/2026-06-26/meals/D%C3%A9jeuner/regenerate')
         ->assertOk();
 });
 

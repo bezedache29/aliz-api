@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\FoodPreference;
+use App\Models\Profile;
 use App\Models\Recipe;
 use App\Models\StockItem;
 use App\Services\LlmService;
@@ -159,6 +160,48 @@ it('passes disliked foods to the LLM', function () {
 
     $this->withToken('test-token')
         ->postJson('/api/recipes/generate', ['prompt' => 'Un repas sans abats'])
+        ->assertCreated();
+});
+
+it('passes the real nutritional goals computed from the profile to the LLM', function () {
+    Profile::create([
+        'first_name'          => 'Christophe',
+        'age'                 => 43,
+        'gender'              => 'male',
+        'height_cm'           => 178,
+        'current_weight_kg'   => 82.5,
+        'target_weight_kg'    => 75.0,
+        'activity_level'      => 'moderate',
+        'weight_loss_rate_kg' => 0.5,
+    ]);
+
+    $this->mock(LlmService::class, function ($mock) {
+        $mock->shouldReceive('generateFullRecipe')
+            ->once()
+            ->withArgs(fn($prompt, $expiring, $other, $liked, $disliked, $profileContext) => $profileContext === [
+                'kcal'      => 2178.0,
+                'proteines' => 165.0,
+                'glucides'  => 242.0,
+                'lipides'   => 61.0,
+            ])
+            ->andReturn(llmRecipePayload());
+    });
+
+    $this->withToken('test-token')
+        ->postJson('/api/recipes/generate', ['prompt' => 'Un plat équilibré'])
+        ->assertCreated();
+});
+
+it('passes a null profile context to the LLM when no profile exists', function () {
+    $this->mock(LlmService::class, function ($mock) {
+        $mock->shouldReceive('generateFullRecipe')
+            ->once()
+            ->withArgs(fn($prompt, $expiring, $other, $liked, $disliked, $profileContext) => $profileContext === null)
+            ->andReturn(llmRecipePayload());
+    });
+
+    $this->withToken('test-token')
+        ->postJson('/api/recipes/generate', ['prompt' => 'Un plat quelconque'])
         ->assertCreated();
 });
 
