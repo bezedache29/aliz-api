@@ -25,12 +25,21 @@ class PlanningController extends Controller
             ->whereNotNull('recipe_id')
             ->orderBy('date')
             ->orderBy('meal_type')
+            ->orderByRaw("FIELD(course, 'Entrée', 'Plat', 'Dessert', '')")
             ->get()
-            ->map(fn(PlanningMeal $meal) => [
-                'date'      => $meal->date->toDateString(),
-                'meal_type' => $meal->meal_type,
-                'recipe'    => $this->formatRecipe($meal->recipe),
-            ])
+            ->groupBy(fn (PlanningMeal $meal) => $meal->date->toDateString() . '|' . $meal->meal_type)
+            ->map(function ($group) {
+                $first = $group->first();
+
+                return [
+                    'date'      => $first->date->toDateString(),
+                    'meal_type' => $first->meal_type,
+                    'courses'   => $group->map(fn (PlanningMeal $m) => [
+                        'course' => $m->course,
+                        'recipe' => $this->formatRecipe($m->recipe),
+                    ])->values(),
+                ];
+            })
             ->values();
 
         return response()->json(['meals' => $meals]);
@@ -40,12 +49,12 @@ class PlanningController extends Controller
     {
         $validated = $request->validated();
 
-        $recipes       = Recipe::select(['id', 'name', 'meal', 'category'])->get();
-        $mealBudget    = app(NutritionGoalService::class)->mealGoals($validated['meal_type']);
-        $mealContext   = app(MealContextService::class);
-        $stock         = $mealContext->stock();
-        $preferences   = $mealContext->foodPreferences();
-        $plannedToday  = $this->plannedMealsForDay($validated['date_key'], $validated['meal_type']);
+        $recipes      = Recipe::select(['id', 'name', 'meal', 'category'])->get();
+        $mealBudget   = app(NutritionGoalService::class)->mealGoals($validated['meal_type']);
+        $mealContext  = app(MealContextService::class);
+        $stock        = $mealContext->stock();
+        $preferences  = $mealContext->foodPreferences();
+        $plannedToday = $this->plannedMealsForDay($validated['date_key'], $validated['meal_type']);
 
         $suggestion = app(LlmService::class)->suggestRecipe(
             $validated['date_key'],
@@ -60,18 +69,40 @@ class PlanningController extends Controller
             $plannedToday,
         );
 
+        $courseSuggestions = $suggestion['type'] === 'menu'
+            ? $suggestion['courses']
+            : [array_merge(['course' => ''], $suggestion)];
+
         try {
-            $recipe = $this->resolveRecipe($suggestion, $mealType);
+            $resolved = collect($courseSuggestions)
+                ->map(fn (array $c) => [
+                    'course' => $c['course'],
+                    'recipe' => $this->resolveRecipe($c, $mealType),
+                ])
+                ->values();
         } catch (\RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 500);
         }
 
-        PlanningMeal::updateOrCreate(
-            ['date' => $dateKey, 'meal_type' => $mealType],
-            ['recipe_id' => $recipe->id],
-        );
+        DB::transaction(function () use ($dateKey, $mealType, $resolved) {
+            PlanningMeal::where('date', $dateKey)->where('meal_type', $mealType)->delete();
 
-        return response()->json(['recipe' => $this->formatRecipe($recipe)]);
+            foreach ($resolved as $entry) {
+                PlanningMeal::create([
+                    'date'      => $dateKey,
+                    'meal_type' => $mealType,
+                    'course'    => $entry['course'],
+                    'recipe_id' => $entry['recipe']->id,
+                ]);
+            }
+        });
+
+        return response()->json([
+            'courses' => $resolved->map(fn ($entry) => [
+                'course' => $entry['course'],
+                'recipe' => $this->formatRecipe($entry['recipe']),
+            ])->values(),
+        ]);
     }
 
     private function plannedMealsForDay(string $dateKey, string $excludingMealType): array
@@ -81,10 +112,13 @@ class PlanningController extends Controller
             ->where('meal_type', '!=', $excludingMealType)
             ->get()
             ->filter(fn (PlanningMeal $m) => $m->recipe !== null)
-            ->map(fn (PlanningMeal $m) => [
-                'meal_type'   => $m->meal_type,
-                'name'        => $m->recipe->name,
-                'ingredients' => $m->recipe->ingredients->pluck('food_name')->all(),
+            ->groupBy('meal_type')
+            ->map(fn ($group, $mealType) => [
+                'meal_type'   => $mealType,
+                'name'        => $group->map(fn (PlanningMeal $m) => $m->recipe->name)->join(' + '),
+                'ingredients' => $group
+                    ->flatMap(fn (PlanningMeal $m) => $m->recipe->ingredients->pluck('food_name'))
+                    ->unique()->values()->all(),
             ])
             ->values()->all();
     }
@@ -102,11 +136,13 @@ class PlanningController extends Controller
             throw new \RuntimeException('Réponse LLM invalide : name manquant');
         }
 
-        return DB::transaction(function () use ($suggestion, $mealType) {
+        $course = $suggestion['course'] ?? '';
+
+        return DB::transaction(function () use ($suggestion, $mealType, $course) {
             $recipe = Recipe::create([
                 'name'                => $suggestion['name'],
                 'description'         => $suggestion['description'] ?? null,
-                'category'            => $this->categoryFromMealType($mealType),
+                'category'            => $this->categoryFor($course, $mealType),
                 'meal'                => $mealType,
                 'steps'               => $suggestion['steps'] ?? [],
                 'seasons'             => [],
@@ -140,6 +176,16 @@ class PlanningController extends Controller
             'Petit-déjeuner' => 'Petit-déjeuner',
             'Collation'      => 'Encas',
             default          => 'Plat principal',
+        };
+    }
+
+    private function categoryFor(string $course, string $mealType): string
+    {
+        return match ($course) {
+            'Entrée'  => 'Entrée',
+            'Dessert' => 'Dessert',
+            'Plat'    => 'Plat principal',
+            default   => $this->categoryFromMealType($mealType),
         };
     }
 

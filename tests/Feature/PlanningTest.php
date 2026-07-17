@@ -25,11 +25,41 @@ it('returns meals for the week', function () {
         ->getJson('/api/planning/week?from=2026-06-23')
         ->assertOk()
         ->assertJsonStructure([
-            'meals' => [['date', 'meal_type', 'recipe' => ['id', 'name', 'kcal', 'proteines', 'glucides', 'lipides', 'prep_time', 'cook_time', 'description']]],
+            'meals' => [['date', 'meal_type', 'courses' => [['course', 'recipe' => ['id', 'name', 'kcal', 'proteines', 'glucides', 'lipides', 'prep_time', 'cook_time', 'description']]]]],
         ])
         ->assertJsonCount(1, 'meals')
         ->assertJsonPath('meals.0.date', '2026-06-26')
-        ->assertJsonPath('meals.0.meal_type', 'Déjeuner');
+        ->assertJsonPath('meals.0.meal_type', 'Déjeuner')
+        ->assertJsonCount(1, 'meals.0.courses')
+        ->assertJsonPath('meals.0.courses.0.course', '')
+        ->assertJsonPath('meals.0.courses.0.recipe.id', $recipe->id);
+});
+
+it('groups multiple courses of the same meal into one entry', function () {
+    $starter = Recipe::factory()->hasIngredients(1)->create();
+    $main    = Recipe::factory()->hasIngredients(1)->create();
+    PlanningMeal::factory()->create([
+        'date'      => '2026-06-26',
+        'meal_type' => 'Dîner',
+        'course'    => 'Entrée',
+        'recipe_id' => $starter->id,
+    ]);
+    PlanningMeal::factory()->create([
+        'date'      => '2026-06-26',
+        'meal_type' => 'Dîner',
+        'course'    => 'Plat',
+        'recipe_id' => $main->id,
+    ]);
+
+    $this->withToken('test-token')
+        ->getJson('/api/planning/week?from=2026-06-23')
+        ->assertOk()
+        ->assertJsonCount(1, 'meals')
+        ->assertJsonCount(2, 'meals.0.courses')
+        ->assertJsonPath('meals.0.courses.0.course', 'Entrée')
+        ->assertJsonPath('meals.0.courses.0.recipe.id', $starter->id)
+        ->assertJsonPath('meals.0.courses.1.course', 'Plat')
+        ->assertJsonPath('meals.0.courses.1.recipe.id', $main->id);
 });
 
 it('returns empty meals array when no planning for the week', function () {
@@ -83,8 +113,9 @@ it('regenerates a meal with existing recipe', function () {
     $this->withToken('test-token')
         ->postJson('/api/planning/week/2026-06-26/meals/D%C3%A9jeuner/regenerate')
         ->assertOk()
-        ->assertJsonStructure(['recipe' => ['id', 'name', 'kcal', 'proteines', 'glucides', 'lipides', 'prep_time', 'cook_time', 'description']])
-        ->assertJsonPath('recipe.id', $recipe->id);
+        ->assertJsonStructure(['courses' => [['course', 'recipe' => ['id', 'name', 'kcal', 'proteines', 'glucides', 'lipides', 'prep_time', 'cook_time', 'description']]]])
+        ->assertJsonPath('courses.0.course', '')
+        ->assertJsonPath('courses.0.recipe.id', $recipe->id);
 
     expect(PlanningMeal::count())->toBe(1);
 });
@@ -109,9 +140,9 @@ it('regenerates a meal with a new LLM-created recipe', function () {
     $this->withToken('test-token')
         ->postJson('/api/planning/week/2026-06-26/meals/D%C3%A9jeuner/regenerate')
         ->assertOk()
-        ->assertJsonPath('recipe.name', 'Omelette au fromage')
-        ->assertJsonPath('recipe.kcal', 350)
-        ->assertJsonPath('recipe.description', 'Simple et rapide à préparer');
+        ->assertJsonPath('courses.0.recipe.name', 'Omelette au fromage')
+        ->assertJsonPath('courses.0.recipe.kcal', 350)
+        ->assertJsonPath('courses.0.recipe.description', 'Simple et rapide à préparer');
 
     expect(Recipe::count())->toBe(1);
     expect(PlanningMeal::count())->toBe(1);
@@ -156,6 +187,109 @@ it('persists steps and ingredients for a new LLM-created recipe', function () {
     expect($recipe->ingredients()->first()->food_name)->toBe('Œufs');
 });
 
+it('persists a multi-course menu as separate planning rows', function () {
+    $starter = Recipe::factory()->hasIngredients(1)->create();
+
+    $this->mock(LlmService::class, function ($mock) use ($starter) {
+        $mock->shouldReceive('suggestRecipe')
+            ->once()
+            ->andReturn([
+                'type'    => 'menu',
+                'courses' => [
+                    ['course' => 'Entrée', 'type' => 'existing', 'recipe_id' => $starter->id],
+                    [
+                        'course'      => 'Dessert',
+                        'type'        => 'new',
+                        'name'        => 'Compote de pommes',
+                        'description' => 'Compote maison',
+                        'kcal'        => 90.0,
+                        'proteines'   => 0.5,
+                        'glucides'    => 20.0,
+                        'lipides'     => 0.2,
+                        'steps'       => ['Éplucher et couper les pommes', 'Cuire à feu doux 20 min'],
+                        'ingredients' => [
+                            [
+                                'food_name'         => 'Pomme',
+                                'quantity_g'        => 300.0,
+                                'per100g_kcal'      => 52.0,
+                                'per100g_proteines' => 0.3,
+                                'per100g_glucides'  => 14.0,
+                                'per100g_lipides'   => 0.2,
+                            ],
+                        ],
+                    ],
+                ],
+            ]);
+    });
+
+    $this->withToken('test-token')
+        ->postJson('/api/planning/week/2026-06-26/meals/D%C3%AEner/regenerate')
+        ->assertOk()
+        ->assertJsonCount(2, 'courses')
+        ->assertJsonPath('courses.0.course', 'Entrée')
+        ->assertJsonPath('courses.0.recipe.id', $starter->id)
+        ->assertJsonPath('courses.1.course', 'Dessert')
+        ->assertJsonPath('courses.1.recipe.name', 'Compote de pommes');
+
+    expect(PlanningMeal::where('date', '2026-06-26')->where('meal_type', 'Dîner')->count())->toBe(2);
+    $dessert = Recipe::where('name', 'Compote de pommes')->first();
+    expect($dessert->category)->toBe('Dessert');
+});
+
+it('replaces all previous courses of a slot when regenerating', function () {
+    $oldStarter = Recipe::factory()->hasIngredients(1)->create();
+    $oldMain    = Recipe::factory()->hasIngredients(1)->create();
+    PlanningMeal::factory()->create(['date' => '2026-06-26', 'meal_type' => 'Dîner', 'course' => 'Entrée', 'recipe_id' => $oldStarter->id]);
+    PlanningMeal::factory()->create(['date' => '2026-06-26', 'meal_type' => 'Dîner', 'course' => 'Plat', 'recipe_id' => $oldMain->id]);
+
+    $newRecipe = Recipe::factory()->hasIngredients(1)->create();
+
+    $this->mock(LlmService::class, function ($mock) use ($newRecipe) {
+        $mock->shouldReceive('suggestRecipe')
+            ->once()
+            ->andReturn(['type' => 'existing', 'recipe_id' => $newRecipe->id]);
+    });
+
+    $this->withToken('test-token')
+        ->postJson('/api/planning/week/2026-06-26/meals/D%C3%AEner/regenerate')
+        ->assertOk()
+        ->assertJsonCount(1, 'courses');
+
+    $meals = PlanningMeal::where('date', '2026-06-26')->where('meal_type', 'Dîner')->get();
+    expect($meals)->toHaveCount(1);
+    expect($meals->first()->recipe_id)->toBe($newRecipe->id);
+    expect($meals->first()->course)->toBe('');
+});
+
+it('merges courses of the same meal type into one entry for the variety context', function () {
+    $starter = Recipe::factory()
+        ->has(RecipeIngredient::factory()->count(1)->state(['food_name' => 'Jambon']), 'ingredients')
+        ->create(['name' => 'Jambon melon']);
+    $main = Recipe::factory()
+        ->has(RecipeIngredient::factory()->count(1)->state(['food_name' => 'Poulet']), 'ingredients')
+        ->create(['name' => 'Poulet rôti']);
+    PlanningMeal::factory()->create(['date' => '2026-06-26', 'meal_type' => 'Déjeuner', 'course' => 'Entrée', 'recipe_id' => $starter->id]);
+    PlanningMeal::factory()->create(['date' => '2026-06-26', 'meal_type' => 'Déjeuner', 'course' => 'Plat', 'recipe_id' => $main->id]);
+
+    $dinnerRecipe = Recipe::factory()->hasIngredients(1)->create();
+
+    $this->mock(LlmService::class, function ($mock) use ($dinnerRecipe) {
+        $mock->shouldReceive('suggestRecipe')
+            ->once()
+            ->withArgs(function ($date, $mealType, $recipes, $prompt, $mealBudget, $expiringStock, $otherStock, $likedFoods, $dislikedFoods, $plannedTodayMeals) {
+                return count($plannedTodayMeals) === 1
+                    && $plannedTodayMeals[0]['meal_type'] === 'Déjeuner'
+                    && $plannedTodayMeals[0]['name'] === 'Jambon melon + Poulet rôti'
+                    && $plannedTodayMeals[0]['ingredients'] === ['Jambon', 'Poulet'];
+            })
+            ->andReturn(['type' => 'existing', 'recipe_id' => $dinnerRecipe->id]);
+    });
+
+    $this->withToken('test-token')
+        ->postJson('/api/planning/week/2026-06-26/meals/D%C3%AEner/regenerate')
+        ->assertOk();
+});
+
 it('updates existing planning slot on re-regenerate', function () {
     $recipe1 = Recipe::factory()->hasIngredients(1)->create();
     $recipe2 = Recipe::factory()->hasIngredients(1)->create();
@@ -175,7 +309,7 @@ it('updates existing planning slot on re-regenerate', function () {
     $this->withToken('test-token')
         ->postJson('/api/planning/week/2026-06-26/meals/D%C3%A9jeuner/regenerate')
         ->assertOk()
-        ->assertJsonPath('recipe.id', $recipe2->id);
+        ->assertJsonPath('courses.0.recipe.id', $recipe2->id);
 
     expect(PlanningMeal::count())->toBe(1);
     expect(PlanningMeal::first()->recipe_id)->toBe($recipe2->id);

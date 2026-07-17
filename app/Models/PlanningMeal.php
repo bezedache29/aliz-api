@@ -11,7 +11,7 @@ class PlanningMeal extends Model
 {
     use HasFactory, HasUuids;
 
-    protected $fillable = ['date', 'meal_type', 'recipe_id'];
+    protected $fillable = ['date', 'meal_type', 'course', 'recipe_id'];
 
     protected $casts = ['date' => 'date'];
 

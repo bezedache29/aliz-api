@@ -36,20 +36,44 @@ class LlmService
         );
 
         $raw = match ($provider) {
-            'openai' => $this->callOpenAI($system, $user, 1024),
-            default  => $this->callAnthropic($system, $user, 1024),
+            'openai' => $this->callOpenAI($system, $user, 2048),
+            default  => $this->callAnthropic($system, $user, 2048),
         };
 
         $decoded = json_decode($raw, true);
-        if (!is_array($decoded) || array_is_list($decoded) || !in_array($decoded['type'] ?? null, ['existing', 'new'], true)) {
+        if (!is_array($decoded) || array_is_list($decoded) || !in_array($decoded['type'] ?? null, ['existing', 'new', 'menu'], true)) {
             throw new \RuntimeException('Réponse LLM invalide : ' . $raw);
         }
 
-        if ($decoded['type'] === 'new' && (empty($decoded['steps']) || empty($decoded['ingredients']))) {
-            throw new \RuntimeException('Réponse LLM invalide : steps ou ingredients manquants');
+        if ($decoded['type'] === 'menu') {
+            if (empty($decoded['courses']) || !is_array($decoded['courses']) || !array_is_list($decoded['courses'])) {
+                throw new \RuntimeException('Réponse LLM invalide : courses manquant ou invalide');
+            }
+
+            foreach ($decoded['courses'] as $course) {
+                if (!is_array($course) || empty($course['course'])) {
+                    throw new \RuntimeException('Réponse LLM invalide : nom de plat (course) manquant');
+                }
+                $this->validateSuggestion($course);
+            }
+
+            return $decoded;
         }
 
+        $this->validateSuggestion($decoded);
+
         return $decoded;
+    }
+
+    private function validateSuggestion(array $suggestion): void
+    {
+        if (!in_array($suggestion['type'] ?? null, ['existing', 'new'], true)) {
+            throw new \RuntimeException('Réponse LLM invalide : type de suggestion manquant ou invalide');
+        }
+
+        if ($suggestion['type'] === 'new' && (empty($suggestion['steps']) || empty($suggestion['ingredients']))) {
+            throw new \RuntimeException('Réponse LLM invalide : steps ou ingredients manquants');
+        }
     }
 
     private function buildSystemPrompt(): string
@@ -62,10 +86,12 @@ Réponds UNIQUEMENT en JSON valide, sans markdown, sans explication.
 Si une recette existante convient (et ne duplique pas un repas déjà prévu aujourd'hui, voir règle 1), retourne :
 {"type":"existing","recipe_id":"<uuid>"}
 
-Règles de priorité (valables aussi bien pour choisir une recette "existing" que pour créer une suggestion "new") :
-1. PRIORITÉ ABSOLUE À LA VARIÉTÉ : si des repas sont déjà prévus le même jour (liste "today_meals"), ne choisis pas une recette existante identique et ne réutilise PAS le même aliment principal (viande, poisson, féculent, légume principal) que l'un de ces repas — quitte à ignorer une opportunité d'écouler le stock ou la DLC. L'utilisateur ne veut pas manger la même chose au déjeuner et au dîner.
-2. Une fois la variété respectée, privilégie les aliments dont la DLC arrive bientôt (liste "expiring_soon") si c'est cohérent avec le repas — ce n'est qu'une préférence, pas une obligation si cela nuit à la variété.
-3. Utilise en priorité les aliments disponibles en stock (liste "other_stock").
+RÈGLE ABSOLUE, PRIORITAIRE SUR TOUTES LES AUTRES : la recette doit être un plat réel et cohérent, comme on en trouverait dans un livre de cuisine ou servi au restaurant — jamais un assemblage forcé d'ingrédients qui ne vont pas ensemble. Le respect du stock, de la DLC ou de la variété ne doit JAMAIS se faire au détriment du bon sens culinaire. Si un aliment du stock ou de la liste "expiring_soon" ne s'intègre pas naturellement dans un plat cohérent, ignore-le simplement pour cette recette — il pourra être utilisé un autre jour. N'associe jamais des éléments qui ne vont pas ensemble (ex. ne mets pas une salade froide type macédoine à l'intérieur d'une quiche cuite, n'improvise pas une association de saveurs qui n'existe dans aucune tradition culinaire).
+
+Règles de priorité, seulement une fois la cohérence culinaire ci-dessus respectée (valables aussi bien pour choisir une recette "existing" que pour créer une suggestion "new") :
+1. VARIÉTÉ : si des repas sont déjà prévus le même jour (liste "today_meals"), ne choisis pas une recette existante identique et ne réutilise PAS le même aliment principal (viande, poisson, féculent, légume principal) que l'un de ces repas — quitte à ignorer une opportunité d'écouler le stock ou la DLC. L'utilisateur ne veut pas manger la même chose au déjeuner et au dîner.
+2. Une fois la variété respectée, privilégie les aliments dont la DLC arrive bientôt (liste "expiring_soon") si c'est cohérent avec le repas — ce n'est qu'une préférence, jamais une obligation si cela nuit à la cohérence ou à la variété.
+3. Utilise en priorité les aliments disponibles en stock (liste "other_stock"), toujours sous réserve de cohérence.
 4. Tu peux suggérer des ingrédients hors stock si nécessaire pour compléter la recette ou pour varier.
 5. N'utilise JAMAIS les aliments de la liste "disliked_foods", et ne choisis pas de recette existante qui en contient.
 6. Favorise les aliments de la liste "liked_foods".
@@ -92,7 +118,18 @@ Sinon, crée une suggestion complète et détaillée, et retourne :
 Les étapes et ingrédients sont obligatoires pour une suggestion "new" : l'utilisateur doit pouvoir cuisiner le plat rien qu'avec ces informations.
 Les macros (kcal, proteines, glucides, lipides) doivent être cohérentes avec les ingrédients et leurs quantités.
 
-Si un budget nutritionnel pour le repas est fourni, la suggestion (existante ou nouvelle) doit s'en rapprocher, avec une tolérance de ±15%.
+Si un budget nutritionnel pour le repas est fourni, la suggestion (existante ou nouvelle, ou l'ensemble des plats d'un menu) doit s'en rapprocher au total, avec une tolérance de ±15%.
+
+MENU À PLUSIEURS PLATS (optionnel) : pour "Déjeuner" ou "Dîner" uniquement, si plusieurs aliments à utiliser ne peuvent pas cohabiter dans un seul plat cohérent (ex. de la charcuterie et un fruit à utiliser ensemble n'ont de sens que dans deux plats séparés : une entrée et un dessert), tu PEUX proposer un menu de 2 à 3 plats au lieu d'un plat unique. Reste exceptionnel : la plupart des repas restent un plat unique. Retourne alors :
+{
+  "type": "menu",
+  "courses": [
+    {"course": "Entrée", ... mêmes champs qu'une suggestion "existing" ou "new" ci-dessus ...},
+    {"course": "Plat", ...},
+    {"course": "Dessert", ...}
+  ]
+}
+Chaque plat du menu doit lui-même respecter TOUTES les règles ci-dessus (cohérence culinaire, variété, stock...), y compris la variété entre eux (ne mets pas deux fois le même aliment principal dans le menu). "Petit-déjeuner" et "Collation" doivent toujours rester un plat unique, jamais un menu.
 PROMPT;
     }
 
@@ -214,9 +251,11 @@ Tu es un chef cuisinier et nutritionniste expert. Tu génères des recettes comp
 
 Réponds UNIQUEMENT en JSON valide, sans markdown, sans explication, sans balise de code.
 
-Règles de priorité pour les ingrédients :
-1. PRIORITÉ ABSOLUE aux aliments dont la DLC arrive bientôt (liste "expiring_soon") — intègre-les impérativement si la recette le permet.
-2. Utilise en priorité les aliments disponibles en stock (liste "other_stock").
+RÈGLE ABSOLUE, PRIORITAIRE SUR TOUTES LES AUTRES : la recette doit être un plat réel et cohérent, comme on en trouverait dans un livre de cuisine ou servi au restaurant — jamais un assemblage forcé d'ingrédients qui ne vont pas ensemble. Le respect du stock ou de la DLC ne doit JAMAIS se faire au détriment du bon sens culinaire. Si un aliment du stock ou de la liste "expiring_soon" ne s'intègre pas naturellement dans un plat cohérent, ignore-le simplement — il pourra être utilisé une autre fois. N'associe jamais des éléments qui ne vont pas ensemble (ex. ne mets pas une salade froide type macédoine à l'intérieur d'une quiche cuite, n'improvise pas une association de saveurs qui n'existe dans aucune tradition culinaire).
+
+Règles de priorité pour les ingrédients, seulement une fois la cohérence culinaire ci-dessus respectée :
+1. Privilégie les aliments dont la DLC arrive bientôt (liste "expiring_soon") si c'est cohérent avec la recette — ce n'est qu'une préférence, jamais une obligation si cela nuit à la cohérence.
+2. Utilise en priorité les aliments disponibles en stock (liste "other_stock"), toujours sous réserve de cohérence.
 3. Tu peux suggérer des ingrédients hors stock si nécessaire pour compléter la recette.
 4. N'utilise JAMAIS les aliments de la liste "disliked_foods".
 5. Favorise les aliments de la liste "liked_foods".
