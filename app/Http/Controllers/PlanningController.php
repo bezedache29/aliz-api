@@ -209,6 +209,7 @@ class PlanningController extends Controller
             'prep_time'   => $recipe->prep_time,
             'cook_time'   => $recipe->cook_time,
             'description' => $recipe->description,
+            'steps'       => $recipe->steps,
             'ingredients' => $recipe->ingredients->map(fn ($i) => [
                 'food_id'           => $i->food_id,
                 'food_name'         => $i->food_name,
