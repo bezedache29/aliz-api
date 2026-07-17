@@ -12,6 +12,7 @@ use App\Services\NutritionGoalService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class PlanningController extends Controller
 {
@@ -157,16 +158,20 @@ class PlanningController extends Controller
 
             $recipe->ingredients()->createMany(
                 collect($suggestion['ingredients'] ?? [])->map(fn ($i) => [
+                    'food_id'           => $i['food_id'] ?? Str::uuid()->toString(),
                     'food_name'         => $i['food_name'],
+                    'food_source'       => $i['food_source'] ?? 'manual',
                     'quantity_g'        => $i['quantity_g'],
                     'per100g_kcal'      => $i['per100g_kcal'],
                     'per100g_proteines' => $i['per100g_proteines'],
                     'per100g_glucides'  => $i['per100g_glucides'],
                     'per100g_lipides'   => $i['per100g_lipides'],
+                    'per100g_fibres'    => $i['per100g_fibres'] ?? 0,
+                    'per100g_sel'       => $i['per100g_sel'] ?? 0,
                 ])->all()
             );
 
-            return $recipe;
+            return $recipe->load('ingredients');
         });
     }
 
@@ -192,6 +197,7 @@ class PlanningController extends Controller
     private function formatRecipe(Recipe $recipe): array
     {
         $macros = $recipe->macros();
+        $recipe->loadMissing('ingredients');
 
         return [
             'id'          => $recipe->id,
@@ -203,6 +209,20 @@ class PlanningController extends Controller
             'prep_time'   => $recipe->prep_time,
             'cook_time'   => $recipe->cook_time,
             'description' => $recipe->description,
+            'ingredients' => $recipe->ingredients->map(fn ($i) => [
+                'food_id'           => $i->food_id,
+                'food_name'         => $i->food_name,
+                'food_source'       => $i->food_source,
+                'food_brand'        => $i->food_brand,
+                'food_barcode'      => $i->food_barcode,
+                'per100g_kcal'      => $i->per100g_kcal,
+                'per100g_proteines' => $i->per100g_proteines,
+                'per100g_glucides'  => $i->per100g_glucides,
+                'per100g_lipides'   => $i->per100g_lipides,
+                'per100g_fibres'    => $i->per100g_fibres,
+                'per100g_sel'       => $i->per100g_sel,
+                'quantity_g'        => $i->quantity_g,
+            ])->all(),
         ];
     }
 }

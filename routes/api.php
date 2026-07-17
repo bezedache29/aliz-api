@@ -3,6 +3,7 @@
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\CustomFoodController;
 use App\Http\Controllers\FoodPreferenceController;
+use App\Http\Controllers\JournalEntryController;
 use App\Http\Controllers\PlanningController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecipeController;
@@ -27,6 +28,12 @@ Route::middleware('auth.static')->group(function () {
 
     // Stock alimentaire
     Route::apiResource('stock', StockController::class)->except(['show']);
+
+    // Journal alimentaire
+    Route::get('journal/entries', [JournalEntryController::class, 'index']);
+    Route::post('journal/entries', [JournalEntryController::class, 'store']);
+    Route::put('journal/entries/{journalEntry}', [JournalEntryController::class, 'update']);
+    Route::delete('journal/entries/{journalEntry}', [JournalEntryController::class, 'destroy']);
 
     // Aliments personnalisés
     Route::get('custom-foods', [CustomFoodController::class, 'index']);
