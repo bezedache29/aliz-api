@@ -65,6 +65,27 @@ it('creates a recipe', function () {
     expect(Recipe::count())->toBe(1);
 });
 
+it('creates a recipe with no seasons (empty array)', function () {
+    $payload = array_merge(recipePayload(), ['seasons' => []]);
+
+    $this->withToken('test-token')
+        ->postJson('/api/recipes', $payload)
+        ->assertCreated()
+        ->assertJsonPath('data.seasons', []);
+
+    expect(Recipe::count())->toBe(1);
+});
+
+it('creates a recipe when seasons is omitted entirely', function () {
+    $payload = collect(recipePayload())->except('seasons')->all();
+
+    $this->withToken('test-token')
+        ->postJson('/api/recipes', $payload)
+        ->assertCreated();
+
+    expect(Recipe::count())->toBe(1);
+});
+
 it('stores a recipe as ai generated when explicitly flagged by the client', function () {
     $payload = array_merge(recipePayload(), ['is_ai_generated' => true]);
 

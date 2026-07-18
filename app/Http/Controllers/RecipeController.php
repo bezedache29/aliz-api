@@ -28,6 +28,10 @@ class RecipeController extends Controller
         $recipe = DB::transaction(function () use ($request) {
             $attributes = $request->safe()->except('ingredients');
             $attributes['is_ai_generated'] = $attributes['is_ai_generated'] ?? false;
+            // Colonnes JSON NOT NULL sans valeur par défaut en base — à défaut d'être
+            // envoyées, "seasons"/"steps" doivent être explicitement vides plutôt qu'absentes.
+            $attributes['seasons'] = $attributes['seasons'] ?? [];
+            $attributes['steps'] = $attributes['steps'] ?? [];
 
             $recipe = Recipe::create($attributes);
             $recipe->ingredients()->createMany($request->validated('ingredients'));
