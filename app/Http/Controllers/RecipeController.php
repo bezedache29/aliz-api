@@ -71,7 +71,7 @@ class RecipeController extends Controller
 
         try {
             $data = app(LlmService::class)->generateFullRecipe(
-                $validated['prompt'],
+                $validated['prompt'] ?? null,
                 $stock['expiring'],
                 $stock['other'],
                 $preferences['liked'],

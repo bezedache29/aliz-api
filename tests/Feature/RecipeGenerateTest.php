@@ -205,16 +205,32 @@ it('passes a null profile context to the LLM when no profile exists', function (
         ->assertCreated();
 });
 
-it('returns 422 when prompt is missing', function () {
+it('generates a recipe when the prompt is omitted', function () {
+    $this->mock(LlmService::class, function ($mock) {
+        $mock->shouldReceive('generateFullRecipe')
+            ->once()
+            ->withArgs(fn ($prompt) => $prompt === null)
+            ->andReturn(llmRecipePayload());
+    });
+
     $this->withToken('test-token')
         ->postJson('/api/recipes/generate', [])
-        ->assertUnprocessable()
-        ->assertJsonValidationErrors(['prompt']);
+        ->assertCreated();
 });
 
-it('returns 422 when prompt is too short', function () {
+it('generates a recipe when the prompt is an empty string', function () {
+    $this->mock(LlmService::class, function ($mock) {
+        $mock->shouldReceive('generateFullRecipe')->once()->andReturn(llmRecipePayload());
+    });
+
     $this->withToken('test-token')
-        ->postJson('/api/recipes/generate', ['prompt' => 'ab'])
+        ->postJson('/api/recipes/generate', ['prompt' => ''])
+        ->assertCreated();
+});
+
+it('returns 422 when prompt exceeds the max length', function () {
+    $this->withToken('test-token')
+        ->postJson('/api/recipes/generate', ['prompt' => str_repeat('a', 501)])
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['prompt']);
 });

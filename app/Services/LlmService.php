@@ -215,7 +215,7 @@ PROMPT;
     }
 
     public function generateFullRecipe(
-        string $userPrompt,
+        ?string $userPrompt,
         array $expiringStock,
         array $otherStock,
         array $likedFoods,
@@ -295,14 +295,20 @@ PROMPT;
     }
 
     private function buildGenerateUserMessage(
-        string $userPrompt,
+        ?string $userPrompt,
         array $expiringStock,
         array $otherStock,
         array $likedFoods,
         array $dislikedFoods,
         ?array $profileContext,
     ): string {
-        $parts = ["Demande : {$userPrompt}"];
+        $parts = [];
+
+        if ($userPrompt) {
+            $parts[] = "Demande : {$userPrompt}";
+        } else {
+            $parts[] = "Demande : aucune préférence précise, propose librement un plat cohérent adapté à mon profil et mon stock.";
+        }
 
         if ($profileContext) {
             $parts[] = "Objectif nutritionnel : {$profileContext['kcal']} kcal/jour, {$profileContext['proteines']}g protéines/jour";
